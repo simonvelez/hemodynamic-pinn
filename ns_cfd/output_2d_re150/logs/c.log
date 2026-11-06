@@ -1,0 +1,77 @@
+
+===== severity 30% =====
+[solver] dofs=30873, dt=0.002, up to 2000 steps
+[solver] step     1  t=0.0020s  newton=2  rel_change=1.00e+00
+[solver] step    25  t=0.0500s  newton=2  rel_change=6.37e-02
+[solver] step    50  t=0.1000s  newton=2  rel_change=6.15e-03
+[solver] step    75  t=0.1500s  newton=2  rel_change=2.77e-03
+[solver] step   100  t=0.2000s  newton=2  rel_change=1.43e-03
+[solver] step   125  t=0.2500s  newton=2  rel_change=7.99e-04
+[solver] step   150  t=0.3000s  newton=2  rel_change=4.50e-04
+[solver] step   175  t=0.3500s  newton=1  rel_change=2.52e-04
+[solver] step   200  t=0.4000s  newton=1  rel_change=1.41e-04
+[solver] step   225  t=0.4500s  newton=1  rel_change=7.90e-05
+[solver] step   250  t=0.5000s  newton=1  rel_change=4.40e-05
+[solver] step   275  t=0.5500s  newton=1  rel_change=2.43e-05
+[solver] step   300  t=0.6000s  newton=1  rel_change=1.24e-05
+[solver] step   325  t=0.6500s  newton=1  rel_change=4.92e-06
+[solver] step   350  t=0.7000s  newton=1  rel_change=1.62e-06
+[solver] finished at t=0.7200s after 360 steps, steady=True (rel_change=9.98e-07)
+[dataset] severity_30: 10291 nodes | steady=True t_end=0.720s | mass err=3.3e-16 | dp=6.57 Pa | max|u|=0.126 m/s | symmetry err=1.5e-03
+
+===== severity 45% =====
+[solver] dofs=30873, dt=0.002, up to 2000 steps
+[solver] step     1  t=0.0020s  newton=2  rel_change=1.00e+00
+[solver] step    25  t=0.0500s  newton=2  rel_change=6.37e-02
+[solver] step    50  t=0.1000s  newton=2  rel_change=7.12e-03
+[solver] step    75  t=0.1500s  newton=2  rel_change=3.61e-03
+[solver] step   100  t=0.2000s  newton=2  rel_change=1.97e-03
+[solver] step   125  t=0.2500s  newton=2  rel_change=1.11e-03
+[solver] step   150  t=0.3000s  newton=2  rel_change=6.28e-04
+[solver] step   175  t=0.3500s  newton=2  rel_change=3.53e-04
+[solver] step   200  t=0.4000s  newton=1  rel_change=1.99e-04
+[solver] step   225  t=0.4500s  newton=1  rel_change=1.12e-04
+[solver] step   250  t=0.5000s  newton=1  rel_change=6.30e-05
+[solver] step   275  t=0.5500s  newton=1  rel_change=3.52e-05
+[solver] step   300  t=0.6000s  newton=1  rel_change=1.67e-05
+[solver] step   325  t=0.6500s  newton=1  rel_change=4.43e-06
+[solver] finished at t=0.6940s after 347 steps, steady=True (rel_change=9.42e-07)
+[dataset] severity_45: 10291 nodes | steady=True t_end=0.694s | mass err=3.3e-16 | dp=8.41 Pa | max|u|=0.155 m/s | symmetry err=2.3e-03
+
+===== severity 60% =====
+[solver] dofs=30873, dt=0.002, up to 2000 steps
+[solver] step     1  t=0.0020s  newton=2  rel_change=1.00e+00
+[solver] step    25  t=0.0500s  newton=2  rel_change=6.39e-02
+[solver] step    50  t=0.1000s  newton=2  rel_change=1.01e-02
+[solver] step    75  t=0.1500s  newton=2  rel_change=6.37e-03
+[solver] step   100  t=0.2000s  newton=2  rel_change=3.66e-03
+[solver] step   125  t=0.2500s  newton=2  rel_change=2.05e-03
+[solver] step   150  t=0.3000s  newton=2  rel_change=1.14e-03
+[solver] step   175  t=0.3500s  newton=2  rel_change=6.34e-04
+[solver] step   200  t=0.4000s  newton=2  rel_change=3.52e-04
+[solver] step   225  t=0.4500s  newton=2  rel_change=1.96e-04
+[solver] step   250  t=0.5000s  newton=1  rel_change=1.10e-04
+[solver] step   275  t=0.5500s  newton=1  rel_change=6.00e-05
+[solver] step   300  t=0.6000s  newton=1  rel_change=2.03e-05
+[solver] step   325  t=0.6500s  newton=1  rel_change=5.03e-06
+[solver] step   350  t=0.7000s  newton=1  rel_change=3.89e-06
+[solver] step   375  t=0.7500s  newton=1  rel_change=3.35e-06
+[solver] step   400  t=0.8000s  newton=1  rel_change=2.97e-06
+[solver] step   425  t=0.8500s  newton=1  rel_change=2.68e-06
+[solver] step   450  t=0.9000s  newton=1  rel_change=2.46e-06
+[solver] step   475  t=0.9500s  newton=1  rel_change=2.29e-06
+[solver] step   500  t=1.0000s  newton=1  rel_change=2.14e-06
+[solver] step   525  t=1.0500s  newton=1  rel_change=2.01e-06
+[solver] step   550  t=1.1000s  newton=1  rel_change=1.90e-06
+[solver] step   575  t=1.1500s  newton=1  rel_change=1.79e-06
+[solver] step   600  t=1.2000s  newton=1  rel_change=1.68e-06
+[solver] step   625  t=1.2500s  newton=1  rel_change=1.59e-06
+[solver] step   650  t=1.3000s  newton=1  rel_change=1.50e-06
+[solver] step   675  t=1.3500s  newton=1  rel_change=1.41e-06
+[solver] step   700  t=1.4000s  newton=1  rel_change=1.33e-06
+[solver] step   725  t=1.4500s  newton=1  rel_change=1.25e-06
+[solver] step   750  t=1.5000s  newton=1  rel_change=1.18e-06
+[solver] step   775  t=1.5500s  newton=1  rel_change=1.11e-06
+[solver] step   800  t=1.6000s  newton=1  rel_change=1.05e-06
+[solver] finished at t=1.6420s after 821 steps, steady=True (rel_change=9.99e-07)
+[dataset] severity_60: 10291 nodes | steady=True t_end=1.642s | mass err=6.5e-16 | dp=14.07 Pa | max|u|=0.210 m/s | symmetry err=5.9e-03
