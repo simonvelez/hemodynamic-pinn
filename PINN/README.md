@@ -45,12 +45,10 @@ tests/             pytest: Poiseuille residual, geometry vs CFD wall, data split
 
 ## Usage (environment `fenicsx-env`, CPU)
 ```bash
-# 1. CFD data. At the default Re≈301 (u_max = 0.2 m/s) the 2D post-stenotic jet breaks
-#    symmetry from ~55 % severity, so only 20–50 % is usable:
-cd ns_cfd && python generate_dataset_2d.py --severities 0.20 0.25 0.30 0.35 0.40 0.45 0.50
-#    For higher severities, lower Re (then train with --data-dir pointing to that folder):
+# 1. CFD data (symmetric `crossed` mesh by default; see notes/CFD.md for the usable ranges)
+cd ns_cfd && python generate_dataset_2d.py --severities 0.20 0.25 0.30 0.35 0.40 0.45 0.50    # Re≈301
 python generate_dataset_2d.py --u-max 0.1 --t-final 4.0 --output-dir output_2d_re150 \
-    --severities 0.20 0.25 0.30 0.35 0.40 0.45 0.50 0.55 0.60 0.65 0.70
+    --severities 0.20 0.25 0.30 0.35 0.40 0.45 0.50 0.55 0.60                               # Re≈150
 
 # 2. Tests
 cd PINN && python -m pytest -q tests
@@ -67,7 +65,7 @@ The loader skips cases whose `meta` reports `steady=False` or
 `symmetry_error > --max-symmetry-error`.
 
 ## References
-- `PINN_mvp/juanes_pinn.py`: the hybrid data+physics pipeline and parameter-vector inputs this builds on.
+- `old/PINN_mvp/juanes_pinn.py`: the hybrid data+physics pipeline and parameter-vector inputs this builds on.
 - A. Aghaee, O. Khan, *CardiovascularPINNs*: https://github.com/Owais-Khan/CardiovascularPINNs
   (single MLP for (u, v, p), tanh/SIREN, adaptive λ, velocity-only sensors).
 - S. Wang, Y. Teng, P. Perdikaris, "Understanding and mitigating gradient flow pathologies in

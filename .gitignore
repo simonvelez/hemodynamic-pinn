@@ -1,5 +1,6 @@
 __pycache__/
 *.pyc
 PINN/runs/
-ns_cfd/output_2d/logs/
+ns_cfd/output_2d*/logs/
+ns_cfd/mesh_study/logs/
 .pytest_cache/

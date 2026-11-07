@@ -38,18 +38,18 @@ class Config:
     adaptive: bool = True              # gradient-based adaptive lambdas (Wang et al. / CardiovascularPINNs)
     adapt_every: int = 10
     adapt_ema: float = 0.9
-    lambda_max: float = 1e3
+    lambda_max: float = 10.0           # validated: 1e3 starved the physics term (pressure off by 20-44 %)
     lambda_wall: float = 1.0           # initial (adaptive) or fixed values
     lambda_inlet: float = 1.0
     lambda_outlet: float = 1.0
     lambda_data: float = 1.0           # 0 -> standard (physics-only) PINN
 
     # --- optimisation -------------------------------------------------------
-    steps: int = 30000
+    steps: int = 20000
     lr: float = 1e-3
-    lr_step: int = 5000
+    lr_step: int = 4000
     lr_gamma: float = 0.5
-    lbfgs_steps: int = 0               # optional L-BFGS polish after Adam
+    lbfgs_steps: int = 2000            # L-BFGS polish after Adam (0 = off)
 
     # --- bookkeeping --------------------------------------------------------
     log_every: int = 100

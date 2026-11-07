@@ -9,13 +9,16 @@ Its job is to produce reference blood-flow fields for training and testing the P
 
 | File | Status | Role |
 |---|---|---|
-| `mesh_2d.py` | **in use** | 2D stenosed-channel mesh built directly in DOLFINx, boundaries tagged |
+| `mesh_2d.py` | **in use** | 2D stenosed-channel mesh built directly in DOLFINx, boundaries tagged (default: symmetric `crossed` triangles) |
 | `solver_2d.py` | **in use** | Incompressible Navier–Stokes solver (FEniCSx / DOLFINx 0.11) |
-| `generate_dataset_2d.py` | **in use** | Command-line driver: mesh → solve → export `.npz` + plot for each severity |
-| `output_2d/` | data | Datasets at Re ≈ 301 (u_max = 0.2 m/s), severities 20–75 % |
-| `output_2d_re150/` | data | Datasets at Re ≈ 150 (u_max = 0.1 m/s), severities 20–70 % |
-| `original_solver.py` | legacy | First 2D prototype; kept for reference only (see §7) |
-| `mesh_generator.py`, `solver.py`, `generate_dataset.py` | incomplete | 3D pipeline (CadQuery + Gmsh); not runnable yet (see §8) |
+| `generate_dataset_2d.py` | **in use** | Command-line driver: mesh → solve → export `.npz` + field plot + **mesh sheet** for each severity |
+| `mesh_plots.py` | **in use** | Mesh inspection: element quality and the one-page mesh troubleshooting sheet |
+| `mesh_study.py`, `mesh_study/` | **in use** | Mesh-independence study (§9) and its results |
+| `output_2d/` | data | Datasets at Re ≈ 301 (u_max = 0.2 m/s), severities 20–50 %, `crossed` mesh |
+| `output_2d_re150/` | data | Datasets at Re ≈ 150 (u_max = 0.1 m/s), severities 20–60 %, `crossed` mesh |
+
+Retired code and data live in `old/` (see `old/README.md`): the first 2D prototype, the 3D skeleton,
+`PINN_mvp`, and the first datasets made on the asymmetric `right`-diagonal mesh.
 
 Environment: conda env **`fenicsx-env`** (Python 3.11, DOLFINx 0.11, PETSc 3.25 with MUMPS).
 
@@ -38,10 +41,9 @@ Run:
 ```bash
 conda activate fenicsx-env
 cd ns_cfd
-python generate_dataset_2d.py                                   # 25 / 50 / 75 %, Re ≈ 301
-python generate_dataset_2d.py --severities 0.20 0.25 0.30 0.35 0.40 0.45 0.50
+python generate_dataset_2d.py --severities 0.20 0.25 0.30 0.35 0.40 0.45 0.50   # Re ≈ 301
 python generate_dataset_2d.py --u-max 0.1 --t-final 4.0 --output-dir output_2d_re150 \
-       --severities 0.20 0.25 ... 0.70                          # Re ≈ 150
+       --severities 0.20 0.25 ... 0.60                          # Re ≈ 150
 ```
 
 ---
@@ -63,9 +65,10 @@ diameter is half the healthy diameter).
 | `length` L | 50 mm (10 D) | The original 30 mm domain was too short for the flow behind the stenosis to recover |
 | `x_center` x_c | 10 mm (2 D) | Keeps the inlet 1.2 D before the stenosis starts; the original had only 5 mm |
 | `half_length` L_s | 4 mm | Stenosis spans 6–14 mm, giving smooth walls without kinks |
-| `nx × ny` | 250 × 40 | h ≈ 0.2 mm axially and 0.125 mm radially in the healthy section; finer at the throat |
+| `nx × ny` | 250 × 40 | h ≈ 0.2 mm axially and 0.125 mm radially in the healthy section; finer at the throat. Verified by the mesh study (§9) |
+| `diagonal` | `crossed` | 4 triangles per cell, mirror-symmetric about y = 0. The former `right` default (2 triangles per cell) seeded artificial asymmetry (§9) |
 
-**Mesh construction.** A structured triangular rectangle `[0, L] × [−R, R]` is generated, and each
+**Mesh construction.** A structured triangular rectangle `[0, L] × [−R, R]` is generated (each cell split into 4 triangles by its diagonals: 40,000 triangles, 20,291 nodes), and each
 node's y-coordinate is scaled by `r(x)/R`. Inlet, outlet and wall facets are tagged **after** the warp,
 so the wall tag follows the curved boundary (inlet = 1, outlet = 2, wall = 3).
 
@@ -135,7 +138,8 @@ Incompressible, Newtonian Navier–Stokes:
 ---
 
 ## 6. Export format (`generate_dataset_2d.py`)
-`pinn2d_severity_XX.npz` contains:
+Per severity: `pinn2d_severity_XX.npz`, the field plot `pinn2d_severity_XX.png` and the mesh sheet
+`pinn2d_severity_XX_mesh.png` (same sheet as the mesh study, §9). The `.npz` contains:
 
 | Key | Content |
 |---|---|
@@ -148,7 +152,7 @@ Incompressible, Newtonian Navier–Stokes:
 
 **Decision: interpolate to plain P1 spaces before export.** In a mixed space the solver's value
 ordering does **not** match `domain.geometry.x`. The prototype's plot assumed it did: 496 of 561
-values were drawn at the wrong node, so `stenosis_50_velocity.png` does not show the real flow.
+values were drawn at the wrong node, so `old/ns_cfd_legacy_2d/stenosis_50_velocity.png` does not show the real flow.
 The exporter interpolates u and p into P1 spaces that share one dofmap and takes coordinates from
 that dofmap. Export is serial-only, since the meshes are small.
 
@@ -156,7 +160,10 @@ that dofmap. Export is serial-only, since the meshes are small.
 
 ## 7. Results
 
-### Re ≈ 301 (`output_2d/`, u_max = 0.2 m/s)
+> These tables come from the **first datasets on the `right`-diagonal mesh** (now in
+> `old/datasets_right_diagonal/`). The symmetry thresholds below are affected by that mesh (§9).
+
+### Re ≈ 301 (u_max = 0.2 m/s)
 | Severity | Steady | Δp [Pa] | max\|u\| [m/s] | Symmetry error | Usable |
 |---|---|---|---|---|---|
 | 20 % | ✔ | 12.21 | 0.223 | 2.0e-3 | ✔ |
@@ -169,7 +176,7 @@ that dofmap. Export is serial-only, since the meshes are small.
 | 55 % | ✘ | 29.21 | 0.358 | 6.0e-2 | ✘ |
 | 60–75 % | ✘ | 40–149 | 0.40–0.64 | 0.78–0.92 | ✘ |
 
-### Re ≈ 150 (`output_2d_re150/`, u_max = 0.1 m/s, t_final = 4 s)
+### Re ≈ 150 (u_max = 0.1 m/s, t_final = 4 s)
 | Severity | Steady | Δp [Pa] | Symmetry error | Usable |
 |---|---|---|---|---|
 | 20–55 % | ✔ | 6.03 → 11.37 | 1.5e-3 – 3.5e-3 | ✔ |
@@ -193,15 +200,15 @@ Runtime: a few minutes per case on one core. Higher severities take longer to re
 
 ---
 
-## 8. Legacy and unfinished code
+## 8. Legacy and unfinished code (moved to `old/`)
 
-**`original_solver.py` (prototype).** It runs under DOLFINx 0.11, but its outputs should not be used:
+**`old/ns_cfd_legacy_2d/original_solver.py` (prototype).** It runs under DOLFINx 0.11, but its outputs should not be used:
 - the plot misplaces nodal values (§6);
 - it runs only 0.03 s after an impulsive start, while one pass of fluid through the domain takes about 0.2 s, and `early_stop_tolerance` is never used;
 - the inlet and outlet are too close to the stenosis;
 - the LSIC term is missing ρ.
 
-**3D pipeline (`mesh_generator.py`, `solver.py`, `generate_dataset.py`).** These are skeletons:
+**3D pipeline (`old/ns_cfd_3d/`: `mesh_generator.py`, `solver.py`, `generate_dataset.py`).** These are skeletons:
 - `build_cadquery_solid` is undefined, and the O-grid meshing steps are only comments;
 - `solver.py` never solves for pressure, applies no inlet BC, has its stabilisation commented out, and uses APIs that are removed or nonexistent in DOLFINx 0.11 (`FunctionSpace`, `gmshio`, `dolfinx.io.get_petsc_options`);
 - `generate_dataset.py` passes point indices where DOLFINx expects cell indices to `Function.eval`.
@@ -217,8 +224,94 @@ that writes `.msh` files for `fenicsx-env` to read. Force-reinstalling pip's VTK
 
 ---
 
-## 9. Known limitations / open items
-- **No mesh-independence study has been done yet.** Δp and the symmetry-breaking thresholds should be checked on a finer mesh (for example 500 × 80).
+## 9. Mesh-independence study (`mesh_study.py`)
+
+**How the production mesh was chosen.** The 250 × 40 mesh was picked by judgement: about 40 cells
+across D and h ≈ 0.1–0.2 mm, with a few minutes of run time per case. It had not been verified.
+Three specific concerns:
+- **Axial spacing is uniform.** Δx = 0.2 mm everywhere, so the shear layer behind the throat
+  (thickness roughly D/√Re ≈ 0.3 mm) spans only 1–2 cells axially.
+- **The (former) default `right` diagonal makes the triangulation asymmetric about y = 0,** even though the
+  nodes are symmetric. The aspect-ratio map in the mesh plots shows this: elongated cells sit
+  upper-left in the converging part and lower-right in the diverging part. This could seed the
+  symmetry breaking.
+- **The steady discrete solution depends slightly on Δt,** because the stabilisation τ_M contains (2/Δt)².
+
+**Method.**
+- Three nested meshes, 125×20, 250×40 and 500×80 (refinement ratio 2).
+- The warp is applied node by node, so every coarse node is also a fine node. Fields are compared
+  node by node with no interpolation error.
+- Discretisation error is estimated with the **Grid Convergence Index** (Roache; Celik et al. 2008):
+  observed order p, Richardson extrapolation, and GCI = 1.25·|e|/(rᵖ − 1).
+- Quantities of interest: Δp, max |u|, centreline u and p at the throat, separation and reattachment
+  points, recirculation length (from where the wall-adjacent row of u changes sign on the upper wall),
+  and node-wise velocity/pressure differences against the fine mesh.
+
+| Study part | Cases |
+|---|---|
+| GCI | 25 % and 50 % at Re ≈ 301; 60 % at Re ≈ 150. Three meshes each |
+| Threshold check | 55 % at Re ≈ 301 and 65 % at Re ≈ 150, on 250×40 `right`, 250×40 `crossed` (symmetric, 4 triangles per cell) and 500×80 `right` |
+| Δt check | 50 % at Re ≈ 301, 250×40, Δt = 1 ms against 2 ms |
+
+```bash
+python mesh_study.py mesh --severity 0.5 --nx 250 --ny 40 --diagonal right   # mesh sheet only, no solve
+python mesh_study.py batch --workers 6     # all runs; skips finished runs, so it can be resumed
+python mesh_study.py report                # mesh_study/report/report.md, gci_table.csv, plots
+```
+
+**Mesh troubleshooting sheets** (`mesh_study/plots/mesh_<tag>.png`, written before every solve):
+- the full mesh with boundary-tag colouring and the analytic wall overlaid;
+- zooms on the stenosis and on the throat wall;
+- maps of minimum angle and aspect ratio;
+- grid spacing along x (Δx, and Δy of the wall-adjacent row);
+- quality histograms;
+- a header with cell and node counts, h_min/h_max, minimum angle, maximum aspect ratio and the number of inverted cells.
+
+A field plot (`fields_<tag>.png`) is also saved for every run.
+
+### Results (full tables in `ns_cfd/mesh_study/report/report.md`)
+
+**Production mesh error estimates** (GCI on the 250×40 mesh; "vs fine" = node-wise relative-L2 difference against 500×80):
+
+| Quantity | 25 % Re≈301 | 50 % Re≈301 | 60 % Re≈150 | Verdict |
+|---|---|---|---|---|
+| Δp | GCI 1.1 % | GCI 1.6 % | GCI 0.3 % | ✔ meets the < 2 % target |
+| Velocity field vs fine | 0.05 % | 0.24 % | 0.32 % | ✔ far below PINN errors (0.5–5 %) |
+| Pressure field vs fine | 0.18 % | 0.91 % (max 0.68 Pa at the throat) | 0.67 % | ✔ for PINN use |
+| Pressure at throat centre | — | GCI 6.0 % | GCI 4.8 % | ⚠ local throat pressure is less converged |
+| Recirculation length | (none) | GCI 10.8 % (9.0 mm against 9.8 extrapolated) | GCI 10.3 % | ✘ underpredicted by about 8 % |
+| Reattachment point | — | GCI 3.7 % | GCI 3.4 % | ≈ acceptable |
+
+- **Conclusion for the PINN:** the production mesh is adequate. The CFD reference error in velocity and
+  pressure is an order of magnitude below the current PINN errors, so the existing datasets stay valid.
+- **For wake studies** (recirculation length, wall shear) use the 500×80 mesh or refine Δx in the wake.
+  Part of the recirculation-length change comes from the measurement itself: the wall-adjacent row
+  moves closer to the wall on finer meshes.
+- **The observed order for Δp at Re ≈ 301 is low (p ≈ 0.3–0.4)** while the differences are tiny
+  (about 0.1 Pa). The solution is probably not yet in the asymptotic range, possibly because of the
+  O(h) stabilisation terms. Treat the extrapolated values as indicative.
+- **Δt also matters.** Halving Δt (2 → 1 ms) changes the steady Δp by 0.7 % and the recirculation
+  length by 2.9 %, comparable to the mesh error. This comes from the (2/Δt)² term in τ_M. Use
+  Δt = 1 ms for high-accuracy reference data.
+
+**The symmetry-breaking thresholds depend on the triangulation:**
+
+| Case | 250×40 `right` | 250×40 `crossed` (symmetric) | 500×80 `right` |
+|---|---|---|---|
+| 55 % Re≈301 | unsteady, symmetry error 0.060 | **steady, perfectly symmetric (8e-16)** | unsteady, 0.043 |
+| 65 % Re≈150 | unsteady, 0.073 | **steady, perfectly symmetric (8e-16)** | unsteady, 0.19 |
+
+- With a symmetric mesh, the cases previously rejected converge to a symmetric steady state.
+- With the asymmetric `right` mesh they don't, even after refinement. On coarser `right` meshes the
+  baseline asymmetry is larger (50 %: 0.022 coarse, 0.0068 medium, 0.0039 fine), so the triangle
+  orientation clearly feeds an asymmetric perturbation into the flow.
+- **What this does not settle:** whether the symmetric state is *stable* at 55 % / 65 %. A symmetric
+  mesh only perturbs the flow at round-off level, which may not grow within 2–4 s even if the flow is
+  unstable. The decisive test is the `crossed` mesh plus a small explicit asymmetric perturbation
+  (for example in the inlet profile or initial condition). If the perturbation decays, the thresholds
+  were mesh artefacts and the PINN severity range can be extended; if it grows, the bifurcation is physical.
+
+## 10. Known limitations / open items
 - Rigid walls, Newtonian blood, steady inflow. No pulsatile waveform yet; `--snapshot-every` makes a time-dependent dataset possible.
 - At high severities the off-centre jet still reaches the outlet. A longer domain (`--length 0.08`) would be needed there.
 - Re is quoted with the peak inlet velocity. State this clearly when comparing with literature, which often uses the mean velocity.

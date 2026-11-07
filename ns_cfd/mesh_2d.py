@@ -27,9 +27,16 @@ def build_stenosis_mesh(
     half_length=0.004,
     nx=250,
     ny=40,
+    diagonal="crossed",
     comm=MPI.COMM_WORLD,
 ):
-    """Return (domain, facet_tags) for a 2D symmetric stenosis."""
+    """Return (domain, facet_tags) for a 2D symmetric stenosis.
+
+    diagonal: how each rectangle is split into triangles. "crossed" (default,
+    4 triangles per cell) is mirror-symmetric about y=0. "right"/"left"
+    (2 triangles per cell) have symmetric nodes but asymmetric triangles, which
+    seeds an artificial asymmetry in the flow (see ns_cfd/mesh_study.py).
+    """
     if not 0.0 <= severity < 1.0:
         raise ValueError("severity must be in [0, 1)")
 
@@ -38,6 +45,7 @@ def build_stenosis_mesh(
         [np.array([0.0, -radius]), np.array([length, radius])],
         [nx, ny],
         cell_type=mesh.CellType.triangle,
+        diagonal=mesh.DiagonalType[diagonal],
     )
 
     # Warp: scale every y by r(x)/R so the walls follow the stenosis profile.

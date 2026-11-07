@@ -23,7 +23,7 @@ training range, including severities that have no CFD data.
 | Boundary conditions | **Soft penalties with adaptive weights** | Works with any geometry (and later 3D) without building distance functions. The weights are tuned automatically by gradient statistics |
 
 ### References and what was taken from each
-- **`PINN_mvp/juanes_pinn.py`** (lab MVP, linear elasticity):
+- **`old/PINN_mvp/juanes_pinn.py`** (lab MVP, linear elasticity):
   - Reused: the three-phase structure (data → hybrid training → benchmark against FEM for timing and L2 error), the idea of appending a parameter vector to the coordinates, and weighting a data loss against a PDE loss.
   - Not carried over: `f_x*2` instead of `f_x**2` (the "squared" residual was not squared, so the loss could go negative); the legacy `fenics` API used under a `dolfinx` import; a hard-constraint mask that reduced to the identity.
 - **CardiovascularPINNs** (A. Aghaee & O. Khan, https://github.com/Owais-Khan/CardiovascularPINNs):
@@ -159,14 +159,17 @@ Learning-rate annealing (Wang, Teng & Perdikaris, 2021), as in CardiovascularPIN
 | Setting | Value | Note |
 |---|---|---|
 | Optimizer | Adam, lr 1e-3, betas (0.9, 0.99) | As in CardiovascularPINNs |
-| LR schedule | StepLR ×0.5 every `lr_step` | Default 5000; the runs so far used 4000 with 20k steps |
-| Steps | default 30k | The runs so far used 20k (CPU time) |
-| L-BFGS | `--lbfgs-steps N` (default 0) | Full-batch polish on one fixed sample with λ frozen; the usual way to lower the final PDE residual |
+| LR schedule | StepLR ×0.5 every 4000 steps | |
+| Steps | 20k Adam | About 2 h on CPU |
+| L-BFGS | 2000 iterations (`--lbfgs-steps 0` turns it off) | Full-batch polish on one fixed sample with λ frozen. Lowered velocity error from about 0.55 % to 0.32 % in the full runs, for about 13 min |
+| λ_max | **10** | Validated (§8). The original 1e3 cap starved the physics term |
 | Precision / seed | float32, seed 0 | Reproducible sampling and sensor selection |
 | Held-out severities | **0.35, 0.45** at Re ≈ 301 (default); **0.35, 0.55** at Re ≈ 150 | Held out completely: no sensor data, used only to measure interpolation. The originally planned 0.55 had to change at Re ≈ 301 because that case is asymmetric |
 | Case rejection | `steady = False` or `symmetry_error > 0.05` | Asymmetric (bifurcated) flows are non-unique, and a smooth surrogate in s should not straddle them |
 
 Usable training ranges are therefore **20–50 % at Re ≈ 301** (7 cases) and **20–60 % at Re ≈ 150** (9 cases).
+On the symmetric `crossed` mesh (now the CFD default) 55 % and 65 % also converge, but whether those
+flows are stable is not yet verified, so the ranges were kept (see `CFD.md` §9).
 
 **Compute.** CPU only (no GPU on this machine):
 - about **0.34 s per step** for a single run with 8 threads, which is roughly 2 h for 20k steps;
@@ -175,7 +178,7 @@ Usable training ranges are therefore **20–50 % at Re ≈ 301** (7 cases) and *
 
 ---
 
-## 8. Results so far
+## 8. Results
 
 Metrics:
 - relative L2 error over all CFD nodes for velocity (u, v together), u, v and p;
@@ -213,7 +216,42 @@ dp*/dx* = −8/Re per diameter, which is about 11 Pa of the 12 Pa at 20 % (Re �
 This confirms the diagnosis. There is a **trade-off**: a lower cap gives better physics and pressure
 but less weight on data and boundaries, so velocity is somewhat worse at equal steps.
 
-Inference: about 10–35 ms for all 10k nodes of one case, compared with minutes for the CFD.
+### Full rerun: `runs/full_re301_lmax10` and `runs/full_re150_lmax10` ✔ current best
+Configuration: λ_max = 10, 20k Adam steps + 2000 L-BFGS, trained on the **regenerated datasets on the
+symmetric `crossed` CFD mesh** (20,291 nodes per case). These settings are now the code defaults.
+
+**Re ≈ 301** (held out: 0.35, 0.45)
+
+| Severity | Split | Velocity L2 | p L2 | Δp CFD | Δp PINN | Δp error |
+|---|---|---|---|---|---|---|
+| 0.20 | train | 0.28 % | 1.9 % | 12.22 Pa | 12.13 Pa | 0.7 % |
+| 0.25 | train | 0.21 % | 2.5 % | 12.82 Pa | 12.58 Pa | 1.9 % |
+| 0.30 | train | 0.23 % | 2.9 % | 13.67 Pa | 13.41 Pa | 1.9 % |
+| **0.35** | **test** | 0.26 % | 2.3 % | 14.88 Pa | 14.79 Pa | **0.6 %** |
+| 0.40 | train | 0.29 % | 2.1 % | 16.64 Pa | 16.86 Pa | 1.3 % |
+| **0.45** | **test** | 0.38 % | 2.6 % | 19.23 Pa | 19.61 Pa | **2.0 %** |
+| 0.50 | train | 0.58 % | 4.0 % | 23.11 Pa | 22.85 Pa | 1.1 % |
+
+**Re ≈ 150** (held out: 0.35, 0.55)
+
+| Severity | Split | Velocity L2 | p L2 | Δp CFD | Δp PINN | Δp error |
+|---|---|---|---|---|---|---|
+| 0.20 | train | 0.34 % | 4.5 % | 6.03 Pa | 5.85 Pa | 2.9 % |
+| 0.25 – 0.30 | train | 0.27–0.28 % | 2.0–3.2 % | | | 0.8–1.7 % |
+| **0.35** | **test** | 0.28 % | 0.95 % | 6.99 Pa | 6.97 Pa | **0.3 %** |
+| 0.40 – 0.50 | train | 0.27–0.34 % | 0.6–1.3 % | | | 0.1–1.2 % |
+| **0.55** | **test** | 0.43 % | 1.2 % | 11.35 Pa | 11.42 Pa | **0.7 %** |
+| 0.60 | train | 0.67 % | 3.5 % | 14.03 Pa | 13.52 Pa | 3.6 % |
+
+Compared with runs 1 and 2:
+- **Pressure error fell by 10–50×**: p L2 dropped from 23–63 % to 0.6–4.5 %, and Δp error from 20–44 % to 0.1–3.6 %.
+- **Velocity also improved** (0.21–0.67 % against 0.4–1.9 %), so the λ_max trade-off seen in the 5k check disappears with full training plus L-BFGS. A cap of 30 is not needed.
+- Final PDE loss is 4–7e-4, far below the viscous pressure-gradient scale 8/Re ≈ 0.027–0.053.
+- **Held-out severities are as accurate as training ones** (Δp 0.3–2.0 %), so the surrogate interpolates in severity.
+- The edges of the severity range remain the weakest: 0.20 and 0.60 at Re ≈ 150 have Δp errors of 2.9 % and 3.6 %. The largest local pressure errors (about 0.2 Pa) sit at the throat wall.
+- The remaining PINN pressure error (0.6–4.5 %) is now comparable to the CFD mesh error (0.2–0.9 % field, GCI ≤ 1.6 % on Δp; see `CFD.md` §9).
+
+Training took 2.1–2.2 h per run (8 CPU threads). Inference takes about 38 ms for all 20k nodes of a case, compared with minutes for the CFD.
 
 ---
 
@@ -227,9 +265,9 @@ Inference: about 10–35 ms for all 10k nodes of one case, compared with minutes
 ---
 
 ## 10. Next steps / open items
-1. **Full rerun** with `--lambda-max 10 --lbfgs-steps 2000` on both datasets (about 4.5 h one after the other).
-   If velocity stays worse than in runs 1 and 2, try `--lambda-max 30` as a compromise.
-   ⚠ The code default is still `lambda_max = 1e3`; change it once the best value is confirmed.
+1. **Disturbance (stability) test on the symmetric CFD mesh** for 55–70 %. If the symmetric flow is stable, extend the PINN severity range.
 2. Physics-only ablation (`--lambda-data 0`) to quantify what the data term contributes.
-3. The v-component relative L2 is large (10–50 %) because v ≈ 0 almost everywhere. Judge it by absolute error or by the velocity-vector L2.
-4. Extensions: pulsatile flow (time as an input, using CFD `--snapshot-every`), Re as a second parameter, and 3D once the CFD 3D pipeline works.
+3. Three seeds of the final configuration to get error bars.
+4. Sensor studies: fewer sensors (50–100 per case), added noise, and placement like MRI planes.
+5. The v-component relative L2 is large (5–17 %) because v ≈ 0 almost everywhere. Judge it by absolute error or by the velocity-vector L2.
+6. Extensions: pulsatile flow (time as an input, using CFD `--snapshot-every`), Re as a second parameter, and 3D once the CFD 3D pipeline works (see `old/ns_cfd_3d/`).

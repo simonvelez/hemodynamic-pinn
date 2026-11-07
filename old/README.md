@@ -1,0 +1,11 @@
+# old/ — retired code and data (kept for reference, not used by the current pipeline)
+
+The active work is the **2D CFD → hybrid PINN** pipeline in `ns_cfd/` and `PINN/`, documented in
+`notes/`. Nothing in `ns_cfd/` or `PINN/` imports anything from this folder.
+
+| Folder | What it is | Why it was retired |
+|---|---|---|
+| `PINN_mvp/` | Lab MVP: hybrid data + physics PINN for linear elasticity (legacy FEniCS) | Superseded by `PINN/`, which reuses its design ideas. Known bugs: `f_x*2` instead of `f_x**2` in the PDE loss, legacy `fenics` API under a `dolfinx` import, and a hard-constraint mask that reduces to the identity |
+| `ns_cfd_3d/` | 3D pipeline skeleton: `mesh_generator.py` (CadQuery + Gmsh O-grid), `solver.py`, `generate_dataset.py`; `test.py` is a CadQuery import check | Not runnable yet: `build_cadquery_solid` is undefined, the O-grid steps are only comments, the solver never solves for pressure, has no inlet BC and uses pre-0.11 DOLFINx APIs. CadQuery cannot be imported in `fenicsx-env` (pip OCP vs conda VTK library names; see `notes/CFD.md` §8). Starting point for future 3D work |
+| `ns_cfd_legacy_2d/` | `original_solver.py` (first 2D prototype) and its plot `stenosis_50_velocity.png` | Replaced by `ns_cfd/solver_2d.py`. **The PNG is wrong:** 496 of 561 nodal values are plotted at the wrong node. The run is also undeveloped (0.03 s after an impulsive start), and the LSIC term is missing ρ |
+| `datasets_right_diagonal/` | The first CFD datasets: `output_2d_re301/` (u_max 0.2 m/s, 20–75 %) and `output_2d_re150/` (u_max 0.1 m/s, 20–70 %) | Generated on the old `right`-diagonal mesh, whose asymmetric triangulation seeds artificial symmetry breaking (`ns_cfd/mesh_study/`). Regenerated on the symmetric `crossed` mesh in `ns_cfd/output_2d*`. The first PINN runs (`PINN/runs/hybrid_s20-50`, `hybrid_re150_s20-60`, `check_re150_lmax10_5k`) were trained on these; to re-evaluate them use `python scripts/evaluate.py --run runs/<name> --data-dir ../old/datasets_right_diagonal/output_2d_re301` (or `_re150`) |

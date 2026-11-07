@@ -7,6 +7,7 @@
 For each severity writes to ./output_2d/:
     pinn2d_severity_XX.npz   nodal x, y, u, v, p, boundary flag, triangles, metadata
     pinn2d_severity_XX.png   velocity-magnitude and pressure fields
+    pinn2d_severity_XX_mesh.png  mesh troubleshooting sheet (tags, quality, spacing)
 
 Runs in serial (the meshes are small; the export relies on serial dof ordering).
 """
@@ -25,6 +26,7 @@ from mpi4py import MPI
 from dolfinx import fem
 
 from mesh_2d import INLET_TAG, OUTLET_TAG, WALL_TAG, build_stenosis_mesh
+from mesh_plots import mesh_arrays, plot_mesh
 from solver_2d import run_simulation
 
 # Node flags stored in the dataset
@@ -93,7 +95,15 @@ def run_case(severity, args):
     domain, facet_tags = build_stenosis_mesh(
         severity=severity, length=args.length, radius=args.radius,
         x_center=args.x_center, half_length=args.half_length, nx=args.nx, ny=args.ny,
+        diagonal=args.diagonal,
     )
+    tag = f"severity_{int(round(severity * 100))}"
+    # Mesh troubleshooting sheet, written before solving so it exists even if the solve fails.
+    xy0, tri0, flag0 = mesh_arrays(domain, facet_tags)
+    geo = dict(severity=severity, length=args.length, radius=args.radius,
+               x_center=args.x_center, half_length=args.half_length)
+    mstats = plot_mesh(os.path.join(args.output_dir, f"pinn2d_{tag}_mesh.png"), xy0, tri0, flag0, geo,
+                       f"Mesh {args.nx}x{args.ny} ({args.diagonal}), severity {severity:.0%}")
     u_h, p_h, info, snapshots = run_simulation(
         domain, facet_tags, u_max=args.u_max, dt=args.dt, t_final=args.t_final,
         steady_tol=args.steady_tol, snapshot_every=args.snapshot_every,
@@ -104,7 +114,8 @@ def run_case(severity, args):
     info["u_max_field"] = float(np.linalg.norm(uv, axis=1).max())
     info["geometry"] = dict(severity=severity, length=args.length, radius=args.radius,
                             x_center=args.x_center, half_length=args.half_length,
-                            nx=args.nx, ny=args.ny)
+                            nx=args.nx, ny=args.ny, diagonal=args.diagonal)
+    info["mesh"] = mstats
 
     data = dict(x=xy[:, 0], y=xy[:, 1], u=uv[:, 0], v=uv[:, 1], p=p,
                 flag=flag, triangles=triangles, meta=json.dumps(info))
@@ -117,7 +128,6 @@ def run_case(severity, args):
         data["v_snap"] = np.stack([f[1][:, 1] for f in fields])
         data["p_snap"] = np.stack([f[2] for f in fields])
 
-    tag = f"severity_{int(round(severity * 100))}"
     np.savez_compressed(os.path.join(args.output_dir, f"pinn2d_{tag}.npz"), **data)
     plot_case(os.path.join(args.output_dir, f"pinn2d_{tag}.png"), xy, uv, p, triangles, severity)
 
@@ -137,6 +147,7 @@ def main():
     ap.add_argument("--half-length", type=float, default=0.004)
     ap.add_argument("--nx", type=int, default=250)
     ap.add_argument("--ny", type=int, default=40)
+    ap.add_argument("--diagonal", default="crossed", help="triangle split: crossed (symmetric) | right | left")
     ap.add_argument("--u-max", type=float, default=0.2)
     ap.add_argument("--dt", type=float, default=0.002)
     ap.add_argument("--t-final", type=float, default=2.0)
