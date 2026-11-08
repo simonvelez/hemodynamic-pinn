@@ -1,0 +1,10 @@
+[batch] 0 done, 8 to run with 6 workers
+[batch] OK  s55_u20_250x40_crossed_eps010 | [run] s55_u20_250x40_crossed_eps010: 40 min | sigma=+0.170 1/s | a_final=2.01e-05 | sym_err=1.1e-04 | UNSTABLE (grows)
+[batch] OK  s50_u20_250x40_crossed_eps010 | [run] s50_u20_250x40_crossed_eps010: 40 min | sigma=-2.058 1/s | a_final=1.53e-07 | sym_err=9.1e-07 | stable (decays)
+[batch] OK  s60_u10_250x40_crossed_eps010 | [run] s60_u10_250x40_crossed_eps010: 40 min | sigma=-1.578 1/s | a_final=9.92e-07 | sym_err=3.8e-06 | stable (decays)
+[batch] OK  s60_u20_250x40_crossed_eps010 | [run] s60_u20_250x40_crossed_eps010: 40 min | sigma=+0.123 1/s | a_final=6.31e-05 | sym_err=2.4e-04 | UNSTABLE (grows)
+[batch] OK  s65_u10_250x40_crossed_eps010 | [run] s65_u10_250x40_crossed_eps010: 39 min | sigma=+0.510 1/s | a_final=2.66e-04 | sym_err=9.1e-04 | UNSTABLE (grows)
+[batch] OK  s65_u20_250x40_crossed_eps010 | [run] s65_u20_250x40_crossed_eps010: 79 min | sigma=+4.233 1/s | a_final=2.46e-01 | sym_err=9.0e-01 | UNSTABLE (grows)
+[batch] OK  s70_u20_250x40_crossed_eps010 | [run] s70_u20_250x40_crossed_eps010: 82 min | sigma=+2.774 1/s | a_final=4.32e-01 | sym_err=9.2e-01 | UNSTABLE (grows)
+[batch] OK  s70_u10_250x40_crossed_eps010 | [run] s70_u10_250x40_crossed_eps010: 66 min | sigma=+2.323 1/s | a_final=2.66e-01 | sym_err=7.2e-01 | UNSTABLE (grows)
+[batch] finished: 8 ok, 0 failed

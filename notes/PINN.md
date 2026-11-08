@@ -168,8 +168,8 @@ Learning-rate annealing (Wang, Teng & Perdikaris, 2021), as in CardiovascularPIN
 | Case rejection | `steady = False` or `symmetry_error > 0.05` | Asymmetric (bifurcated) flows are non-unique, and a smooth surrogate in s should not straddle them |
 
 Usable training ranges are therefore **20–50 % at Re ≈ 301** (7 cases) and **20–60 % at Re ≈ 150** (9 cases).
-On the symmetric `crossed` mesh (now the CFD default) 55 % and 65 % also converge, but whether those
-flows are stable is not yet verified, so the ranges were kept (see `CFD.md` §9).
+The CFD stability test (`CFD.md` §9) confirmed these limits are physical: above them the symmetric
+flow is unstable and the real flow is an asymmetric jet with two mirror-image solutions.
 
 **Compute.** CPU only (no GPU on this machine):
 - about **0.34 s per step** for a single run with 8 threads, which is roughly 2 h for 20k steps;
@@ -255,6 +255,27 @@ Training took 2.1–2.2 h per run (8 CPU threads). Inference takes about 38 ms f
 
 ---
 
+### Seed variance and physics-only ablation (Re ≈ 150; `runs/comparison_re150.md`)
+Made with `scripts/compare_runs.py`. "Hybrid" = the full configuration over 3 seeds (0, 1, 2), shown
+as mean ± std. A different seed changes the network initialisation, the sensor locations and the
+collocation sampling. "Physics-only" = the same configuration with `--lambda-data 0`.
+
+| | Hybrid, train | Hybrid, **held-out** | Physics-only, train | Physics-only, held-out |
+|---|---|---|---|---|
+| Velocity L2 | 0.38 ± 0.03 % | 0.40 ± 0.05 % | 18.4 % | 24.0 % |
+| Pressure L2 | 2.45 ± 0.19 % | 1.22 ± 0.15 % | 41.7 % | 46.7 % |
+| Δp error | 1.80 ± 0.25 % | 0.47 ± 0.02 % | 42.0 % | 51.9 % |
+
+- **The results are robust to the seed.** The spread between seeds is small compared with the
+  effects discussed above. The weakest case is consistently the 60 % edge (Δp error 4.9 ± 1.1 %).
+- **The data term is essential at this Re.**
+  - Physics-only is reasonable at 20 % (velocity 4 %) but degrades steadily with severity: velocity 44 % and Δp 78 % at 60 %.
+  - Without data, the network does not find the jet and recirculation that the stenosis creates.
+    This is the known difficulty of physics-only PINNs at moderate Re.
+  - This is the main argument for the hybrid approach.
+  - Caveat: physics-only used the hyperparameters tuned for the hybrid model. A dedicated physics-only
+    setup (more steps, Re or severity curriculum, Fourier features) might do better, but it is unlikely to close a gap this large.
+
 ## 9. Tests (`python -m pytest -q tests`, 9 tests)
 | Test | What it guarantees |
 |---|---|
@@ -265,9 +286,10 @@ Training took 2.1–2.2 h per run (8 CPU threads). Inference takes about 38 ms f
 ---
 
 ## 10. Next steps / open items
-1. **Disturbance (stability) test on the symmetric CFD mesh** for 55–70 %. If the symmetric flow is stable, extend the PINN severity range.
-2. Physics-only ablation (`--lambda-data 0`) to quantify what the data term contributes.
-3. Three seeds of the final configuration to get error bars.
-4. Sensor studies: fewer sensors (50–100 per case), added noise, and placement like MRI planes.
-5. The v-component relative L2 is large (5–17 %) because v ≈ 0 almost everywhere. Judge it by absolute error or by the velocity-vector L2.
-6. Extensions: pulsatile flow (time as an input, using CFD `--snapshot-every`), Re as a second parameter, and 3D once the CFD 3D pipeline works (see `old/ns_cfd_3d/`).
+1. ~~Stability test~~ ✔ done: the severity limits are physical; the ranges stay.
+2. ~~Physics-only ablation~~ ✔ done: the data term is essential.
+3. ~~Seeds~~ ✔ done for Re ≈ 150 (Re ≈ 301 seeds optional).
+4. Sensor studies: fewer sensors (50–100 per case), added noise, and placement like MRI planes. This is now the main open question for realism.
+5. Improve the edges of the severity range (0.20 and 0.60 have the largest errors), for example with more collocation points or sensors near the range ends.
+6. The v-component relative L2 is large (5–17 %) because v ≈ 0 almost everywhere. Judge it by absolute error or by the velocity-vector L2.
+7. Extensions: pulsatile flow (time as an input, using CFD `--snapshot-every`), Re as a second parameter, and 3D (see `old/ns_cfd_3d/`).

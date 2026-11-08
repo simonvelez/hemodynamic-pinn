@@ -305,11 +305,47 @@ A field plot (`fields_<tag>.png`) is also saved for every run.
 - With the asymmetric `right` mesh they don't, even after refinement. On coarser `right` meshes the
   baseline asymmetry is larger (50 %: 0.022 coarse, 0.0068 medium, 0.0039 fine), so the triangle
   orientation clearly feeds an asymmetric perturbation into the flow.
-- **What this does not settle:** whether the symmetric state is *stable* at 55 % / 65 %. A symmetric
+- **What this does not settle** (resolved by the stability test below): whether the symmetric state is *stable* at 55 % / 65 %. A symmetric
   mesh only perturbs the flow at round-off level, which may not grow within 2–4 s even if the flow is
   unstable. The decisive test is the `crossed` mesh plus a small explicit asymmetric perturbation
   (for example in the inlet profile or initial condition). If the perturbation decays, the thresholds
   were mesh artefacts and the PINN severity range can be extended; if it grows, the bifurcation is physical.
+
+### Stability test (`stability_test.py`): the symmetry breaking is physical
+
+The question left open by the mesh study was whether the symmetric flow at 55–70 % is stable or only
+looked steady because the symmetric mesh never disturbs it. To test it:
+- An antisymmetric, zero-flux disturbance ε·η(1 − η²) (η = y/R, ε = 0.01, peak 0.4 % of u_max) was
+  added to the inlet for t < 0.2 s. The inlet was then symmetric again.
+- The asymmetry a(t) = max|v| on the centreline / u_max was tracked.
+- σ is the late-time growth rate, fitted after the post-disturbance minimum.
+- Mesh 250×40 `crossed`, t ≤ 6 s.
+
+| Re | Severity | σ (1/s) | Verdict |
+|---|---|---|---|
+| ≈ 301 | 50 % (control) | −1.91 | **stable**: the disturbance decays |
+| ≈ 301 | 55 % | +0.86 | **unstable** |
+| ≈ 301 | 60 % | +3.21 | **unstable** |
+| ≈ 301 | 65 %, 70 % | +4.6, +2.1 | **unstable**: saturates into the deflected jet (symmetry error 0.9) |
+| ≈ 150 | 60 % (control) | −1.17 | **stable** |
+| ≈ 150 | 65 % | +0.85 | **unstable** |
+| ≈ 150 | 70 % | +2.71 | **unstable**: saturates (symmetry error 0.72) |
+
+- **The critical severity lies between 50 and 55 % at Re ≈ 301, and between 60 and 65 % at Re ≈ 150.**
+  These are the same limits found originally with the `right` mesh. The old mesh did not create the
+  instability; it only *triggered* it, the way any real disturbance would.
+- The steady symmetric `crossed` solutions at 55 % / 65 % in the mesh study were **unstable
+  equilibria**: they persisted only because nothing perturbed them.
+- **Consequence for the PINN:** the training ranges stay 20–50 % (Re ≈ 301) and 20–60 % (Re ≈ 150).
+  Above them the physical steady flow is the asymmetric (Coanda) state, which has two mirror-image
+  solutions, so it cannot be represented by a symmetric-in-severity surrogate.
+- Caveats:
+  - The cases growing at about 0.9/s stopped at 3 s when the steady criterion triggered (the change
+    per step was below 1e-6 while growing slowly), so they did not reach saturation. That doesn't affect the verdict.
+  - Growth rates of the saturating cases (65–70 % at Re ≈ 301) are only indicative.
+  - The threshold could be refined further with runs at 52.5 % and 62.5 %.
+
+Results: `ns_cfd/stability/report/report.md` and `asymmetry_vs_time.png`. Mesh and field plots per case are in `ns_cfd/stability/plots/`.
 
 ## 10. Known limitations / open items
 - Rigid walls, Newtonian blood, steady inflow. No pulsatile waveform yet; `--snapshot-every` makes a time-dependent dataset possible.
