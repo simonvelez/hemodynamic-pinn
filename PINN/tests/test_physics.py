@@ -42,3 +42,26 @@ def test_residuals_differentiable_wrt_parameters():
     r = ns_residuals(m, _points(64).float(), RE)
     sum((x ** 2).mean() for x in r).backward()
     assert all(p.grad is not None and torch.isfinite(p.grad).all() for p in m.parameters())
+
+
+def test_poiseuille_satisfies_traction_outlet():
+    """Fully developed outflow with p = 0 at x = 10 meets -p + u_x/Re = 0, v_x = 0 exactly."""
+    from pinn.physics import outlet_traction
+
+    class OutletGauge(Poiseuille):
+        def forward(self, xys):
+            out = super().forward(xys)
+            return torch.cat([out[:, :2], 8 * (10 - xys[:, 0:1]) / RE], dim=1)
+
+    pts = _points()
+    pts[:, 0] = 10.0
+    t_x, t_y = outlet_traction(OutletGauge(), pts, RE)
+    assert t_x.abs().max() < 1e-12 and t_y.abs().max() < 1e-12
+
+
+def test_traction_outlet_detects_pressure_offset():
+    from pinn.physics import outlet_traction
+    pts = _points()
+    pts[:, 0] = 10.0
+    t_x, _ = outlet_traction(Poiseuille(), pts, RE)   # p = -80/Re at x = 10, not 0
+    assert torch.allclose(t_x, torch.full_like(t_x, 80 / RE))

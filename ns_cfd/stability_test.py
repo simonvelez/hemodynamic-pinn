@@ -45,14 +45,22 @@ MARGINAL = 0.1        # |sigma| < this [1/s] -> "marginal"
 STUDY = (
     [dict(severity=s, u_max=0.2) for s in (0.50, 0.55, 0.60, 0.65, 0.70)]    # Re≈301 (0.50 = control)
     + [dict(severity=s, u_max=0.1) for s in (0.60, 0.65, 0.70)]             # Re≈150 (0.60 = control)
+    # Threshold check with the corrected scheme (P2/P1 Taylor-Hood, gradient-form viscous term):
+    # On 125x20: with P2 velocity it has the same nodes as the P1 250x40 runs and is within
+    # 0.3-0.4 % (velocity) of the 500x80 solution (mesh study); 250x40 P2 time-marching takes ~8 h/case.
+    + [dict(severity=s, u_max=u, element="P2P1", viscous_form="grad", nx=125, ny=20)
+       for s, u in ((0.50, 0.2), (0.55, 0.2), (0.65, 0.2), (0.70, 0.2), (0.60, 0.1), (0.65, 0.1), (0.70, 0.1))]
 )
-DEFAULTS = dict(nx=250, ny=40, diagonal="crossed", eps=EPS)
+# Original runs used P1/P1 + SUPG/PSPG/LSIC with the symmetric viscous form (legacy tags).
+DEFAULTS = dict(nx=250, ny=40, diagonal="crossed", eps=EPS, element="P1P1", viscous_form="sym")
+LEGACY_SCHEME = ("P1P1", "sym")
 
 
 def tag_of(c):
     c = {**DEFAULTS, **c}
+    scheme = "" if (c["element"], c["viscous_form"]) == LEGACY_SCHEME else f"_{c['element']}{c['viscous_form']}"
     return (f"s{round(c['severity'] * 100):02d}_u{round(c['u_max'] * 100):02d}_{c['nx']}x{c['ny']}"
-            f"_{c['diagonal']}_eps{round(c['eps'] * 1000):03d}")
+            f"_{c['diagonal']}_eps{round(c['eps'] * 1000):03d}{scheme}")
 
 
 def growth_rate(hist, t_start):
@@ -97,7 +105,7 @@ def cmd_run(args):
     from solver_2d import run_simulation
 
     c = dict(severity=args.severity, u_max=args.u_max, nx=args.nx, ny=args.ny,
-             diagonal=args.diagonal, eps=args.eps)
+             diagonal=args.diagonal, eps=args.eps, element=args.element, viscous_form=args.viscous_form)
     tag = tag_of(c)
     for d in ("runs", "plots"):
         (OUT / d).mkdir(parents=True, exist_ok=True)
@@ -111,7 +119,8 @@ def cmd_run(args):
     t0 = time.time()
     u_h, p_h, info, _ = run_simulation(domain, ft, u_max=args.u_max, dt=0.002, t_final=args.t_final,
                                        perturb_eps=args.eps, perturb_until=PERTURB_UNTIL,
-                                       min_time=MIN_TIME, verbose=True)
+                                       min_time=MIN_TIME, element=args.element,
+                                       viscous_form=args.viscous_form, verbose=True)
     xy, uv, p, flag, tri = nodal_arrays(domain, ft, u_h, p_h)
     sigma, npts = growth_rate(info["asym_history"], PERTURB_UNTIL + 0.3)
     a_final = info["asym_history"][-1][1]
@@ -135,7 +144,8 @@ def cmd_batch(args):
         c = {**DEFAULTS, **c}
         cmd = [sys.executable, str(Path(__file__).resolve()), "run", "--severity", str(c["severity"]),
                "--u-max", str(c["u_max"]), "--nx", str(c["nx"]), "--ny", str(c["ny"]),
-               "--diagonal", c["diagonal"], "--eps", str(c["eps"])]
+               "--diagonal", c["diagonal"], "--eps", str(c["eps"]),
+               "--element", c["element"], "--viscous-form", c["viscous_form"]]
         log = OUT / "logs" / f"{tag_of(c)}.log"
         with open(log, "w") as f:
             r = subprocess.run(cmd, cwd=HERE, stdout=f, stderr=subprocess.STDOUT)
@@ -157,28 +167,31 @@ def cmd_report(args):
     rep.mkdir(parents=True, exist_ok=True)
     md = ["# Stability of the symmetric 2D stenosis flow\n",
           f"Antisymmetric inlet perturbation eps = {EPS} (peak ≈ {0.385 * EPS:.1%} of u_max) for t < {PERTURB_UNTIL} s, "
-          f"then symmetric inlet; mesh 250×40 crossed; growth rate σ = late-time slope of log a(t) "
+          f"then symmetric inlet; mesh 250×40 crossed (P1P1) or 125×20 crossed (P2P1); growth rate σ = late-time slope of log a(t) "
           f"(after the post-perturbation minimum, {FLOOR:g} < a < {LINEAR_MAX:g}). "
           f"Runs stop as 'steady' after {MIN_TIME} s if the change per step is < 1e-6, so slowly "
           f"growing cases end before saturating.\n",
-          "| Re | severity | σ (1/s) | max a(t) | final a | final symmetry err | steady | t_end (s) | verdict |",
-          "|---|---|---|---|---|---|---|---|---|"]
+          "| Re | severity | scheme | σ (1/s) | max a(t) | final a | final symmetry err | steady | t_end (s) | verdict |",
+          "|---|---|---|---|---|---|---|---|---|---|"]
     fig, axes = plt.subplots(1, 2, figsize=(13, 4.5), dpi=130, sharey=True)
     for c in STUDY:
         f = OUT / "runs" / f"{tag_of(c)}.npz"
         re_lab = "≈301" if c["u_max"] == 0.2 else "≈150"
+        cc = {**DEFAULTS, **c}
+        scheme = f"{cc['element']}/{cc['viscous_form']}"
         if not f.exists():
-            md.append(f"| {re_lab} | {c['severity']:.0%} | – | – | – | – | – | – | not run |")
+            md.append(f"| {re_lab} | {c['severity']:.0%} | {scheme} | – | – | – | – | – | – | not run |")
             continue
         m = json.loads(str(np.load(f)["meta"]))
         m["sigma"], _ = growth_rate(m["asym_history"], PERTURB_UNTIL + 0.3)
         m["verdict"] = verdict(m["sigma"], m["a_final"])
         sig = "–" if not np.isfinite(m["sigma"]) else f"{m['sigma']:+.3f}"
-        md.append(f"| {re_lab} | {c['severity']:.0%} | {sig} | {m['a_max']:.2e} | {m['a_final']:.2e} | "
+        md.append(f"| {re_lab} | {c['severity']:.0%} | {scheme} | {sig} | {m['a_max']:.2e} | {m['a_final']:.2e} | "
                   f"{m['symmetry_error']:.1e} | {m['steady']} | {m['t_end']:.2f} | **{m['verdict']}** |")
         t, a = np.asarray(m["asym_history"]).T
         ax = axes[0 if c["u_max"] == 0.2 else 1]
-        ax.semilogy(t, np.maximum(a, 1e-17), label=f"{c['severity']:.0%}  ({m['verdict']})")
+        ax.semilogy(t, np.maximum(a, 1e-17), ls="-" if (cc["element"], cc["viscous_form"]) == LEGACY_SCHEME else "--",
+                    label=f"{c['severity']:.0%} {scheme} ({m['verdict']})")
     for ax, title in zip(axes, ("Re ≈ 301 (u_max 0.2 m/s)", "Re ≈ 150 (u_max 0.1 m/s)")):
         ax.axvspan(0, PERTURB_UNTIL, color="0.9", label="perturbation on")
         ax.axhline(LINEAR_MAX, color="0.5", ls=":", lw=0.8)
@@ -204,6 +217,8 @@ def main():
     sr.add_argument("--ny", type=int, default=40)
     sr.add_argument("--diagonal", default="crossed")
     sr.add_argument("--eps", type=float, default=EPS)
+    sr.add_argument("--element", default=DEFAULTS["element"], choices=["P1P1", "P2P1"])
+    sr.add_argument("--viscous-form", default=DEFAULTS["viscous_form"], choices=["sym", "grad"])
     sr.add_argument("--t-final", type=float, default=T_FINAL)
     sb = sub.add_parser("batch")
     sb.add_argument("--workers", type=int, default=6)

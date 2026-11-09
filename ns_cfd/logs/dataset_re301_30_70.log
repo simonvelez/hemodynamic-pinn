@@ -1,0 +1,121 @@
+
+===== severity 30% =====
+[solver] P2P1 viscous=grad stabilised=False dofs=181453, steady Newton + continuation
+[solver] amplitude 0.2500  newton=4  asym=3.21e-02
+[solver] amplitude 0.6250  newton=4  asym=1.18e-01
+[solver] amplitude 1.0000  newton=4  asym=2.24e-01
+[solver] imperfection 0.2700  newton=3  asym=2.01e-01
+[solver] imperfection 0.2250  newton=3  asym=1.66e-01
+[solver] imperfection 0.1575  newton=3  asym=1.15e-01
+[solver] imperfection 0.0563  newton=3  asym=4.08e-02
+[solver] imperfection 0.0000  newton=3  asym=5.00e-13
+[solver] steady solve done: 8 continuation levels, 27 Newton iterations
+[dataset] severity_30: 20291 nodes | steady=True t_end=0.000s | mass err=5.0e-14 | dp=13.76 Pa | max|u|=0.245 m/s | symmetry err=4.1e-12 | branch=symmetric | peak WSS=2.48 Pa | L_recirc=0.62 mm
+
+===== severity 35% =====
+[solver] P2P1 viscous=grad stabilised=False dofs=181453, steady Newton + continuation
+[solver] amplitude 0.2500  newton=4  asym=3.19e-02
+[solver] amplitude 0.6250  newton=4  asym=1.19e-01
+[solver] amplitude 1.0000  newton=4  asym=2.27e-01
+[solver] imperfection 0.2700  newton=3  asym=2.04e-01
+[solver] imperfection 0.2250  newton=3  asym=1.70e-01
+[solver] imperfection 0.1575  newton=3  asym=1.18e-01
+[solver] imperfection 0.0563  newton=3  asym=4.20e-02
+[solver] imperfection 0.0000  newton=3  asym=1.23e-12
+[solver] steady solve done: 8 continuation levels, 27 Newton iterations
+[dataset] severity_35: 20291 nodes | steady=True t_end=0.000s | mass err=4.9e-14 | dp=14.94 Pa | max|u|=0.259 m/s | symmetry err=7.1e-12 | branch=symmetric | peak WSS=3.06 Pa | L_recirc=2.70 mm
+
+===== severity 40% =====
+[solver] P2P1 viscous=grad stabilised=False dofs=181453, steady Newton + continuation
+[solver] amplitude 0.2500  newton=4  asym=3.16e-02
+[solver] amplitude 0.6250  newton=4  asym=1.20e-01
+[solver] amplitude 1.0000  newton=4  asym=2.29e-01
+[solver] imperfection 0.2700  newton=3  asym=2.07e-01
+[solver] imperfection 0.2250  newton=3  asym=1.73e-01
+[solver] imperfection 0.1575  newton=3  asym=1.22e-01
+[solver] imperfection 0.0563  newton=3  asym=4.38e-02
+[solver] imperfection 0.0000  newton=3  asym=1.11e-11
+[solver] steady solve done: 8 continuation levels, 27 Newton iterations
+[dataset] severity_40: 20291 nodes | steady=True t_end=0.000s | mass err=4.9e-14 | dp=16.65 Pa | max|u|=0.276 m/s | symmetry err=4.6e-11 | branch=symmetric | peak WSS=3.78 Pa | L_recirc=4.60 mm
+
+===== severity 45% =====
+[solver] P2P1 viscous=grad stabilised=False dofs=181453, steady Newton + continuation
+[solver] amplitude 0.2500  newton=4  asym=3.13e-02
+[solver] amplitude 0.6250  newton=4  asym=1.20e-01
+[solver] amplitude 1.0000  newton=4  asym=2.26e-01
+[solver] imperfection 0.2700  newton=3  asym=2.06e-01
+[solver] imperfection 0.2250  newton=3  asym=1.75e-01
+[solver] imperfection 0.1575  newton=3  asym=1.25e-01
+[solver] imperfection 0.0563  newton=4  asym=4.61e-02
+[solver] imperfection 0.0000  newton=3  asym=3.64e-10
+[solver] steady solve done: 8 continuation levels, 28 Newton iterations
+[dataset] severity_45: 20291 nodes | steady=True t_end=0.000s | mass err=4.9e-14 | dp=19.15 Pa | max|u|=0.297 m/s | symmetry err=2.8e-09 | branch=symmetric | peak WSS=4.66 Pa | L_recirc=6.87 mm
+
+===== severity 50% =====
+[solver] P2P1 viscous=grad stabilised=False dofs=181453, steady Newton + continuation
+[solver] amplitude 0.2500  newton=4  asym=3.09e-02
+[solver] amplitude 0.6250  newton=4  asym=1.18e-01
+[solver] amplitude 1.0000  newton=4  asym=2.14e-01
+[solver] imperfection 0.2700  newton=3  asym=1.96e-01
+[solver] imperfection 0.2250  newton=3  asym=1.69e-01
+[solver] imperfection 0.1575  newton=4  asym=1.26e-01
+[solver] imperfection 0.0563  newton=4  asym=5.45e-02
+[solver] imperfection 0.0000  newton=4  asym=3.55e-11
+[solver] steady solve done: 8 continuation levels, 30 Newton iterations
+[dataset] severity_50: 20291 nodes | steady=True t_end=0.000s | mass err=4.9e-14 | dp=22.87 Pa | max|u|=0.323 m/s | symmetry err=2.6e-10 | branch=symmetric | peak WSS=5.78 Pa | L_recirc=9.71 mm
+
+===== severity 55% =====
+[solver] P2P1 viscous=grad stabilised=False dofs=181453, steady Newton + continuation
+[solver] amplitude 0.2500  newton=4  asym=3.03e-02
+[solver] amplitude 0.6250  newton=4  asym=1.10e-01
+[solver] amplitude 1.0000  newton=5  asym=1.92e-01
+[solver] imperfection 0.2700  newton=3  asym=1.79e-01
+[solver] imperfection 0.2250  newton=3  asym=1.67e-01
+[solver] imperfection 0.1575  newton=3  asym=1.50e-01
+[solver] imperfection 0.0563  newton=4  asym=1.17e-01
+[solver] imperfection 0.0000  newton=5  asym=7.09e-02
+[solver] steady solve done: 8 continuation levels, 31 Newton iterations
+[dataset] severity_55: 20291 nodes | steady=True t_end=0.000s | mass err=4.8e-14 | dp=28.76 Pa | max|u|=0.356 m/s | symmetry err=3.8e-01 | branch=asymmetric | peak WSS=7.29 Pa | L_recirc=8.17 mm
+
+===== severity 60% =====
+[solver] P2P1 viscous=grad stabilised=False dofs=181453, steady Newton + continuation
+[solver] amplitude 0.2500  newton=4  asym=2.92e-02
+[solver] amplitude 0.6250  newton=5  asym=1.09e-01
+[solver] amplitude 1.0000 failed (Error); increment -> 0.28125
+[solver] amplitude 0.9062  newton=5  asym=1.96e-01
+[solver] amplitude 1.0000  newton=3  asym=2.34e-01
+[solver] imperfection 0.2700  newton=3  asym=2.20e-01
+[solver] imperfection 0.2250  newton=3  asym=2.14e-01
+[solver] imperfection 0.1575  newton=3  asym=2.04e-01
+[solver] imperfection 0.0563  newton=4  asym=1.85e-01
+[solver] imperfection 0.0000  newton=4  asym=1.71e-01
+[solver] steady solve done: 9 continuation levels, 34 Newton iterations
+[dataset] severity_60: 20291 nodes | steady=True t_end=0.000s | mass err=4.8e-14 | dp=38.84 Pa | max|u|=0.399 m/s | symmetry err=7.6e-01 | branch=asymmetric | peak WSS=9.41 Pa | L_recirc=6.80 mm
+
+===== severity 65% =====
+[solver] P2P1 viscous=grad stabilised=False dofs=181453, steady Newton + continuation
+[solver] amplitude 0.2500  newton=4  asym=2.66e-02
+[solver] amplitude 0.6250  newton=7  asym=1.47e-01
+[solver] amplitude 1.0000  newton=8  asym=3.96e-01
+[solver] imperfection 0.2700  newton=3  asym=3.74e-01
+[solver] imperfection 0.2250  newton=3  asym=3.41e-01
+[solver] imperfection 0.1575  newton=4  asym=2.96e-01
+[solver] imperfection 0.0563  newton=4  asym=2.47e-01
+[solver] imperfection 0.0000  newton=3  asym=2.40e-01
+[solver] steady solve done: 8 continuation levels, 36 Newton iterations
+[dataset] severity_65: 20291 nodes | steady=True t_end=0.000s | mass err=4.9e-14 | dp=55.39 Pa | max|u|=0.454 m/s | symmetry err=8.9e-01 | branch=asymmetric | peak WSS=12.28 Pa | L_recirc=6.82 mm
+
+===== severity 70% =====
+[solver] P2P1 viscous=grad stabilised=False dofs=181453, steady Newton + continuation
+[solver] amplitude 0.2500  newton=6  asym=2.59e-02
+[solver] amplitude 0.6250 failed (Error); increment -> 0.18750
+[solver] amplitude 0.4375  newton=6  asym=1.17e-01
+[solver] amplitude 0.7188  newton=12  asym=3.18e-01
+[solver] amplitude 1.0000  newton=8  asym=6.05e-01
+[solver] imperfection 0.2700  newton=3  asym=5.82e-01
+[solver] imperfection 0.2250  newton=4  asym=5.49e-01
+[solver] imperfection 0.1575  newton=4  asym=5.00e-01
+[solver] imperfection 0.0563  newton=4  asym=4.33e-01
+[solver] imperfection 0.0000  newton=4  asym=3.99e-01
+[solver] steady solve done: 9 continuation levels, 51 Newton iterations
+[dataset] severity_70: 20291 nodes | steady=True t_end=0.000s | mass err=4.9e-14 | dp=84.79 Pa | max|u|=0.530 m/s | symmetry err=9.1e-01 | branch=asymmetric | peak WSS=16.45 Pa | L_recirc=7.04 mm

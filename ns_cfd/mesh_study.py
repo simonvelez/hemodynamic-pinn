@@ -46,15 +46,23 @@ STUDY = (
        for s, u, tf in ((0.55, 0.2, 2.0), (0.65, 0.1, 4.0))
        for (nx, ny), d in (((250, 40), "right"), ((250, 40), "crossed"), ((500, 80), "right"))]
     + [dict(severity=0.50, u_max=0.2, t_final=2.0, nx=250, ny=40, dt=0.001)]
+    # Corrected scheme (Taylor-Hood P2/P1 + gradient-form viscous term), symmetric mesh:
+    + [dict(severity=s, u_max=u, t_final=2.0, nx=nx, ny=ny, diagonal="crossed",
+            element="P2P1", viscous_form="grad", steady_solve=True)
+       for s, u in ((0.25, 0.2), (0.50, 0.2), (0.60, 0.1)) for nx, ny in MESHES]
 )
-# The study itself was run with the old "right" default; keep it explicit so tags stay valid.
-DEFAULTS = dict(diagonal="right", dt=0.002, t_final=2.0)
+# The study itself was run with the old "right" default and the original P1/P1 +
+# symmetric-viscous scheme; keep both explicit so the old tags stay valid.
+DEFAULTS = dict(diagonal="right", dt=0.002, t_final=2.0, element="P1P1", viscous_form="sym",
+                steady_solve=False)
+LEGACY_SCHEME = ("P1P1", "sym")
 
 
 def tag_of(c):
     c = {**DEFAULTS, **c}
+    scheme = "" if (c["element"], c["viscous_form"]) == LEGACY_SCHEME else f"_{c['element']}{c['viscous_form']}"
     return (f"s{round(c['severity'] * 100):02d}_u{round(c['u_max'] * 100):02d}_{c['nx']}x{c['ny']}"
-            f"_{c['diagonal']}_dt{round(c['dt'] * 1e4):02d}")
+            f"_{c['diagonal']}_dt{round(c['dt'] * 1e4):02d}{scheme}{'_steady' if c['steady_solve'] else ''}")
 
 
 from mesh_plots import mesh_arrays, plot_mesh  # noqa: E402
@@ -135,7 +143,8 @@ def cmd_run(args):
     from solver_2d import run_simulation
 
     c = dict(severity=args.severity, u_max=args.u_max, nx=args.nx, ny=args.ny,
-             diagonal=args.diagonal, dt=args.dt, t_final=args.t_final)
+             diagonal=args.diagonal, dt=args.dt, t_final=args.t_final,
+             element=args.element, viscous_form=args.viscous_form, steady_solve=args.steady_solve)
     tag = tag_of(c)
     (OUT / "runs").mkdir(parents=True, exist_ok=True)
     (OUT / "plots").mkdir(parents=True, exist_ok=True)
@@ -147,7 +156,9 @@ def cmd_run(args):
 
     t0 = time.time()
     u_h, p_h, info, _ = run_simulation(domain, ft, u_max=args.u_max, dt=args.dt,
-                                       t_final=args.t_final, verbose=True)
+                                       t_final=args.t_final, element=args.element,
+                                       viscous_form=args.viscous_form, steady_solve=args.steady_solve,
+                                       verbose=True)
     wall = time.time() - t0
     xy, uv, p, flag, tri = nodal_arrays(domain, ft, u_h, p_h)
     info.update(symmetry_error=symmetry_error(xy, uv), wall_time_s=wall, mesh=mstats,
@@ -164,7 +175,7 @@ def cmd_batch(args):
     todo = [c for c in STUDY if not (OUT / "runs" / f"{tag_of(c)}.npz").exists()]
     # longest first: fine meshes, then crossed, then the rest
     todo.sort(key=lambda c: -(c["nx"] * c["ny"] * (2 if c.get("diagonal") == "crossed" else 1)
-                              * c.get("t_final", 2.0)))
+                              * (4 if c.get("element") == "P2P1" else 1) * c.get("t_final", 2.0)))
     print(f"[batch] {len(STUDY) - len(todo)} done, {len(todo)} to run with {args.workers} workers", flush=True)
     (OUT / "logs").mkdir(parents=True, exist_ok=True)
 
@@ -173,7 +184,8 @@ def cmd_batch(args):
         cmd = [sys.executable, str(Path(__file__).resolve()), "run",
                "--severity", str(c["severity"]), "--u-max", str(c["u_max"]), "--nx", str(c["nx"]),
                "--ny", str(c["ny"]), "--diagonal", c["diagonal"], "--dt", str(c["dt"]),
-               "--t-final", str(c["t_final"])]
+               "--t-final", str(c["t_final"]), "--element", c["element"],
+               "--viscous-form", c["viscous_form"]] + (["--steady-solve"] if c["steady_solve"] else [])
         with open(OUT / "logs" / f"{tag_of(c)}.log", "w") as log:
             r = subprocess.run(cmd, cwd=HERE, stdout=log, stderr=subprocess.STDOUT)
         last = (OUT / "logs" / f"{tag_of(c)}.log").read_text().strip().splitlines()[-1:]
@@ -248,10 +260,14 @@ def cmd_report(args):
     md = ["# Mesh-independence study — results\n"]
     csv_rows = []
 
-    families = [((0.25, 0.2), "Re≈301"), ((0.50, 0.2), "Re≈301"), ((0.60, 0.1), "Re≈150")]
-    for (s, u), re_lab in families:
-        runs = [load_run(tag_of(dict(severity=s, u_max=u, nx=nx, ny=ny))) for nx, ny in MESHES]
-        name = f"{round(s * 100)}% {re_lab}"
+    legacy = {}
+    families = [((0.25, 0.2), "Re≈301", legacy), ((0.50, 0.2), "Re≈301", legacy),
+                ((0.60, 0.1), "Re≈150", legacy),
+                *[((s_, u_), lab, dict(diagonal="crossed", element="P2P1", viscous_form="grad", steady_solve=True))
+                  for s_, u_, lab in ((0.25, 0.2, "Re≈301"), (0.50, 0.2, "Re≈301"), (0.60, 0.1, "Re≈150"))]]
+    for (s, u), re_lab, extra in families:
+        runs = [load_run(tag_of(dict(severity=s, u_max=u, nx=nx, ny=ny, **extra))) for nx, ny in MESHES]
+        name = f"{round(s * 100)}% {re_lab}" + (" — P2/P1, grad, crossed, steady solve" if extra else "")
         if any(r is None for r in runs):
             md.append(f"\n## {name}: incomplete ({sum(r is not None for r in runs)}/3 meshes)\n")
             continue
@@ -368,6 +384,9 @@ def main():
             sp.add_argument("--u-max", type=float, default=0.2)
             sp.add_argument("--dt", type=float, default=0.002)
             sp.add_argument("--t-final", type=float, default=2.0)
+            sp.add_argument("--element", default=DEFAULTS["element"], choices=["P1P1", "P2P1"])
+            sp.add_argument("--viscous-form", default=DEFAULTS["viscous_form"], choices=["sym", "grad"])
+            sp.add_argument("--steady-solve", action="store_true", help="direct steady Newton (no time marching)")
     sb = sub.add_parser("batch")
     sb.add_argument("--workers", type=int, default=6)
     sub.add_parser("report")

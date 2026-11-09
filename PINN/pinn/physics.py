@@ -29,3 +29,20 @@ def ns_residuals(model, xys, Re):
     r_y = u * v_x + v * v_y + gp[:, 1:2] - (v_xx + v_yy) / Re
     r_c = u_x + v_y
     return r_x, r_y, r_c
+
+
+def outlet_traction(model, xys, Re):
+    """Outlet do-nothing residuals for the gradient-form viscous term, normal n = +x:
+
+        -p + (1/Re) du/dx = 0,      dv/dx = 0
+
+    This is the natural boundary condition of the CFD weak form
+    (mu grad u : grad v, ns_cfd/solver_2d.py, viscous_form="grad"). Fully
+    developed Poiseuille outflow satisfies it with p = 0 at the outlet.
+    """
+    xys = xys.detach().requires_grad_(True)
+    out = model(xys)
+    u, v, p = out[:, 0:1], out[:, 1:2], out[:, 2:3]
+    u_x = _grad(u, xys)[:, 0:1]
+    v_x = _grad(v, xys)[:, 0:1]
+    return -p + u_x / Re, v_x

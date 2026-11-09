@@ -17,6 +17,25 @@ def wall_radius(x, s, geo):
     return geo.R * (1.0 - 0.5 * s * (1.0 + lib.cos(math.pi * xi)))
 
 
+def wall_slope(x, s, geo):
+    """dr/dx of the cosine wall (numpy or torch)."""
+    lib = torch if torch.is_tensor(x) else np
+    xi = (x - geo.x_center) / geo.half_length
+    inside = lib.abs(xi) <= 1.0
+    val = geo.R * s * math.pi / (2.0 * geo.half_length) * lib.sin(math.pi * lib.clip(xi, -1.0, 1.0))
+    return lib.where(inside, val, lib.zeros_like(val) if torch.is_tensor(val) else 0.0)
+
+
+def wall_frame(x, y, s, geo):
+    """Unit tangent t (positive x-component) and unit normal n_in (into the fluid)
+    at wall points, matching ns_cfd/wall_shear.py. Returns numpy arrays (N, 2)."""
+    rp = wall_slope(np.asarray(x), s, geo)
+    sgn = np.sign(y)
+    n_in = np.stack([rp, -sgn], axis=1)
+    t = np.stack([np.ones_like(rp), sgn * rp], axis=1)
+    return t / np.linalg.norm(t, axis=1, keepdims=True), n_in / np.linalg.norm(n_in, axis=1, keepdims=True)
+
+
 def _uniform(n, lo, hi, gen):
     return lo + (hi - lo) * torch.rand(n, 1, generator=gen)
 

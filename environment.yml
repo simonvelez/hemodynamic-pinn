@@ -1,0 +1,28 @@
+# Environment for the 2D CFD (FEniCSx) + PINN (PyTorch) pipeline.
+# Versions pinned to the laptop environment `fenicsx-env` that produced the 2026-11-08 datasets.
+#
+#   conda env create -f environment.yml
+#   conda activate fenicsx-env
+#
+# GPU machine (e.g. NVIDIA A4000): the pip torch below is the default (CUDA-enabled on Linux)
+# wheel. If it does not match the driver, reinstall from the matching index, e.g.
+#   pip install torch==2.12.1 --index-url https://download.pytorch.org/whl/cu126
+# and check:  python -c "import torch; print(torch.cuda.is_available(), torch.cuda.get_device_name(0))"
+#
+# Record the actual versions of every run: they are written to run_manifest.json automatically.
+name: fenicsx-env
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - fenics-dolfinx=0.11.0
+  - petsc=3.25.2
+  - mpich=5.0.1
+  - mumps-mpi=5.8.2
+  - numpy=2.4
+  - scipy=1.17
+  - matplotlib=3.10
+  - pytest
+  - pip
+  - pip:
+      - torch==2.12.1

@@ -67,6 +67,72 @@
 | coarse 125×20 (2646 nodes) | 1.17% | 1.86% | 0.0040 m/s | 0.824 Pa |
 | medium 250×40 (10291 nodes) | 0.32% | 0.67% | 0.0014 m/s | 0.316 Pa |
 
+## 25% Re≈301 — P2/P1, grad, crossed, steady solve (severity 0.25, u_max 0.2 m/s)
+
+| mesh | cells | steady | symmetry err | wall time |
+|---|---|---|---|---|
+| 125×20 | 10000 | True | 1.1e-15 | 0.1 min |
+| 250×40 | 40000 | True | 1.8e-15 | 0.4 min |
+| 500×80 | 160000 | True | 3.3e-15 | 1.9 min |
+
+| QoI | coarse | medium (production) | fine | order p | extrapolated | GCI fine | GCI medium | medium vs extrap. | convergence |
+|---|---|---|---|---|---|---|---|---|---|
+| Δp (Pa) | 12.92 | 12.93 | 12.93 | 1.972 | 12.93 | 0.01% | 0.03% | 0.02% | monotonic |
+| max|u| (m/s) | 0.2328 | 0.2329 | 0.2329 | 0.9206 | 0.233 | 0.03% | 0.05% | 0.04% | monotonic |
+| u throat centre (m/s) | 0.2305 | 0.2306 | 0.2306 | 1.542 | 0.2306 | 0.01% | 0.02% | 0.02% | monotonic |
+| p throat centre (Pa) | 3.684 | 3.674 | 3.671 | 1.783 | 3.67 | 0.04% | 0.14% | 0.11% | monotonic |
+| recirculation length (mm) | – | – | – | – | – | – | – | – | n/a |
+| reattachment x (mm) | – | – | – | – | – | – | – | – | n/a |
+
+| field difference vs fine mesh (shared nodes) | rel-L2 velocity | rel-L2 pressure | max abs Δu | max abs Δp |
+|---|---|---|---|---|
+| coarse 125×20 (5146 nodes) | 0.05% | 0.19% | 0.0010 m/s | 0.058 Pa |
+| medium 250×40 (20291 nodes) | 0.01% | 0.04% | 0.0003 m/s | 0.015 Pa |
+
+## 50% Re≈301 — P2/P1, grad, crossed, steady solve (severity 0.50, u_max 0.2 m/s)
+
+| mesh | cells | steady | symmetry err | wall time |
+|---|---|---|---|---|
+| 125×20 | 10000 | True | 1.6e-15 | 0.1 min |
+| 250×40 | 40000 | True | 4.8e-15 | 0.4 min |
+| 500×80 | 160000 | True | 7.2e-15 | 2.0 min |
+
+| QoI | coarse | medium (production) | fine | order p | extrapolated | GCI fine | GCI medium | medium vs extrap. | convergence |
+|---|---|---|---|---|---|---|---|---|---|
+| Δp (Pa) | 22.75 | 22.87 | 22.91 | 1.937 | 22.92 | 0.06% | 0.25% | 0.20% | monotonic |
+| max|u| (m/s) | 0.3229 | 0.3235 | 0.3237 | 1.372 | 0.3238 | 0.06% | 0.15% | 0.12% | monotonic |
+| u throat centre (m/s) | 0.3158 | 0.3162 | 0.3164 | 1.584 | 0.3164 | 0.03% | 0.09% | 0.07% | monotonic |
+| p throat centre (Pa) | -11.23 | -11.26 | -11.27 | 1.427 | -11.27 | 0.06% | 0.16% | 0.13% | monotonic |
+| recirculation length (mm) | 7.374 | 8.704 | 9.254 | 1.274 | 9.642 | 5.24% | 13.47% | 9.73% | monotonic |
+| reattachment x (mm) | 19.28 | 20.3 | 20.72 | 1.262 | 21.02 | 1.83% | 4.48% | 3.46% | monotonic |
+
+| field difference vs fine mesh (shared nodes) | rel-L2 velocity | rel-L2 pressure | max abs Δu | max abs Δp |
+|---|---|---|---|---|
+| coarse 125×20 (5146 nodes) | 0.28% | 1.13% | 0.0058 m/s | 0.413 Pa |
+| medium 250×40 (20291 nodes) | 0.06% | 0.24% | 0.0016 m/s | 0.105 Pa |
+
+## 60% Re≈150 — P2/P1, grad, crossed, steady solve (severity 0.60, u_max 0.1 m/s)
+
+| mesh | cells | steady | symmetry err | wall time |
+|---|---|---|---|---|
+| 125×20 | 10000 | True | 1.5e-15 | 0.1 min |
+| 250×40 | 40000 | True | 3.3e-15 | 0.4 min |
+| 500×80 | 160000 | True | 6.5e-15 | 2.1 min |
+
+| QoI | coarse | medium (production) | fine | order p | extrapolated | GCI fine | GCI medium | medium vs extrap. | convergence |
+|---|---|---|---|---|---|---|---|---|---|
+| Δp (Pa) | 13.83 | 13.94 | 13.96 | 1.925 | 13.97 | 0.09% | 0.35% | 0.28% | monotonic |
+| max|u| (m/s) | 0.2087 | 0.2098 | 0.21 | 2.516 | 0.21 | 0.02% | 0.14% | 0.11% | monotonic |
+| u throat centre (m/s) | 0.203 | 0.2035 | 0.2037 | 1.566 | 0.2038 | 0.06% | 0.18% | 0.14% | monotonic |
+| p throat centre (Pa) | -3.978 | -3.977 | -3.978 | – | – | 0.03% | – | – | oscillatory |
+| recirculation length (mm) | 7.463 | 8.429 | 8.833 | 1.26 | 9.122 | 4.09% | 10.27% | 7.59% | monotonic |
+| reattachment x (mm) | 19.24 | 19.96 | 20.26 | 1.271 | 20.47 | 1.30% | 3.19% | 2.49% | monotonic |
+
+| field difference vs fine mesh (shared nodes) | rel-L2 velocity | rel-L2 pressure | max abs Δu | max abs Δp |
+|---|---|---|---|---|
+| coarse 125×20 (5146 nodes) | 0.40% | 1.19% | 0.0051 m/s | 0.222 Pa |
+| medium 250×40 (20291 nodes) | 0.08% | 0.25% | 0.0013 m/s | 0.064 Pa |
+
 ## Symmetry-breaking threshold: mesh and triangle-orientation dependence
 
 | case | mesh | diagonal | steady | symmetry err | Δp (Pa) | verdict (usable?) |

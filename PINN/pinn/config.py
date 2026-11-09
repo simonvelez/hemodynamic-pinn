@@ -18,6 +18,11 @@ class Config:
     max_symmetry_error: float = 0.05   # reject bifurcated (asymmetric) CFD cases
     n_sensors: int = 500               # CFD velocity "sensors" per training case
     data_pressure: bool = False        # also supervise p (default: pressure inferred from physics)
+    sensor_noise: float = 0.0          # Gaussian noise std on sensor targets, fraction of U (robustness study)
+    sensor_seed: int = -1              # seed for sensor locations + noise (-1: use `seed`)
+    data_s_range: list = field(default_factory=list)     # [lo, hi]: only cases inside get sensors; others -> test
+    physics_s_range: list = field(default_factory=list)  # [lo, hi]: severities where physics is enforced
+                                                         # (default: all loaded cases incl. held-out)
 
     # --- model --------------------------------------------------------------
     activation: str = "tanh"           # tanh | sine
@@ -33,6 +38,7 @@ class Config:
     n_wall: int = 512
     n_inlet: int = 256
     n_outlet: int = 256
+    outlet_bc: str = "traction"        # traction (-p + u_x/Re = 0, v_x = 0; matches CFD) | pressure (p = 0, legacy)
 
     # --- loss weighting -----------------------------------------------------
     adaptive: bool = True              # gradient-based adaptive lambdas (Wang et al. / CardiovascularPINNs)
@@ -43,6 +49,7 @@ class Config:
     lambda_inlet: float = 1.0
     lambda_outlet: float = 1.0
     lambda_data: float = 1.0           # 0 -> standard (physics-only) PINN
+    lambda_pde: float = 1.0            # 0 -> data-only network baseline (no NS residual; BC weights fixed)
 
     # --- optimisation -------------------------------------------------------
     steps: int = 20000
@@ -56,7 +63,8 @@ class Config:
     eval_every: int = 1000
     save_every: int = 5000
     seed: int = 0
-    device: str = "cpu"
+    device: str = "cpu"                # cpu | cuda | cuda:0 ...
+    dtype: str = "float32"             # float32 | float64 (whole run; float64 helps L-BFGS)
     threads: int = 0                   # >0: torch.set_num_threads
 
     def save(self, path):

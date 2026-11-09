@@ -129,7 +129,7 @@ L = L_pde + λ_wall·L_wall + λ_inlet·L_inlet + λ_outlet·L_outlet + λ_data�
 | `pde` | 4096 interior points per step | momentum residuals in x and y, plus continuity | Derivatives are spatial only; s is treated as a parameter |
 | `wall` | 512 on the analytic wall | u = v = 0 | No-slip |
 | `inlet` | 256 at x = 0 | u = 1 − (y/R)², v = 0 | Same profile as the CFD; a unit test checks this |
-| `outlet` | 256 at x = L | p = 0 | Consistent with the CFD's traction-free outlet |
+| `outlet` | 256 at x = L | −p + (1/Re) ∂u/∂x = 0 and ∂v/∂x = 0 (`--outlet-bc traction`, default since 2026-11-08) | Same natural condition as the corrected CFD (gradient-form viscous term, `CFD.md` §11). The old `p = 0` (`--outlet-bc pressure`) did not match the old CFD outlet, whose pressure varied by up to 0.3 Pa across the section |
 | `data` | 500 CFD nodes × each training severity | u, v (and p only with `--data-pressure`) | **Pressure is not supervised by default** |
 
 **Why velocity-only data.** It mimics realistic measurements (velocity from 4D-flow MRI or Doppler),
@@ -275,6 +275,45 @@ collocation sampling. "Physics-only" = the same configuration with `--lambda-dat
   - This is the main argument for the hybrid approach.
   - Caveat: physics-only used the hyperparameters tuned for the hybrid model. A dedicated physics-only
     setup (more steps, Re or severity curriculum, Fourier features) might do better, but it is unlikely to close a gap this large.
+
+### 2026-11-08: pressure correction and new options
+- **The pressure gap was partly in the reference.** The old CFD outlet condition and P1 pressure stabilisation
+  biased the CFD pressure by 1–3 % (rel-L2) and Δp by about 1 % (`CFD.md` §11). The PINN imposed p = 0 at an
+  outlet where the CFD pressure was not uniform. Datasets were regenerated with P2/P1, and the PINN outlet now
+  uses the matching traction condition.
+- **Relative L2 overstates the pressure error.** In units of the pressure drop, the old Re ≈ 150 run had an RMS
+  pressure error of only 0.3–2.4 % of Δp. Most of it was a smooth offset upstream of the throat
+  (`p_offset_over_dp` −2.1 % at 20 %), not a local failure: the centreline p(x) curves overlap.
+- New evaluation outputs: `pressure_lines_severity_XX.png` (centreline, wall p(x) and wall shear stress, CFD vs PINN),
+  `l2_p_meanfree`, `p_rms_over_dp`, `p_max_over_dp`, `p_offset_over_dp`, `l2_wss`, `wss_peak_rel_err`, and
+  recirculation length (CFD vs PINN, from WSS sign changes). Inference timing is the median of 10 runs and
+  CUDA-synchronised. Every train/evaluate run writes `run_manifest.json` and `cost.json` (stage timings).
+- New options for the robustness and comparison campaign (all CLI flags):
+  `--sensor-noise` (Gaussian, fraction of U), `--sensor-seed`, `--lambda-pde 0` (data-only network baseline;
+  adaptive weights are disabled because they are normalised by the PDE gradient), `--data-s-range lo hi` and
+  `--physics-s-range lo hi` (true severity extrapolation), `--dtype float64`, `--device cuda`.
+- Retrains on the new datasets (default config, traction outlet, 20k Adam + 2000 L-BFGS, CPU 8 threads,
+  2.1–2.3 h): `runs/p2_re150`, `runs/p2_re301`.
+
+| | Re ≈ 150 (held out 0.35, 0.55) | Re ≈ 301 (held out 0.35, 0.45) |
+|---|---|---|
+| velocity L2 | 0.20–0.63 % (held-out 0.21 / 0.37 %) | 0.17–0.50 % (held-out 0.20 / 0.34 %) |
+| pressure L2 | 0.6–4.8 % | 0.9–4.7 % |
+| pressure RMS error / Δp | 0.3–2.5 % | 0.4–2.0 % |
+| Δp error | 0.1–4.8 % (held-out 0.1 / 0.2 %) | 0.3–3.2 % (held-out 0.3 / 3.2 %) |
+| WSS L2 along the wall | 2.0–3.6 %, 9.2 % at 60 % | 2.6–4.5 %, 8.9 % at 50 % |
+| peak WSS error | 0.2–3.4 %, 11 % at 60 % | 0.1–5.5 % |
+| recirculation length | within 0.04 D (0.4 D CFD at 40 %) … 1.83 vs 1.83 D at 60 % | within 0.12 D |
+
+  - **Velocity improved slightly; pressure did not change much.** The reference is now correct (CFD Δp GCI
+    ≤ 0.35 %), so the remaining 1–5 % pressure error is genuinely the PINN's. It is a smooth offset, not noise:
+    negative at the low-severity edge, positive in the middle (`p_offset_over_dp` −2.4 … +1.4 %).
+  - **The weakest point is the throat of the most severe case.** At 60 % (Re ≈ 150) the PINN under-predicts
+    the pressure drop across the contraction by about 0.7 Pa and the peak WSS by 11 %. Downstream of the
+    throat it matches the CFD (`pressure_lines_severity_60.png`). This is the expected spectral-bias limit
+    at the sharpest feature and at the edge of the severity range. Candidate fixes for the campaign:
+    more collocation near the throat, Fourier features or SIREN, hard BCs, float64 + longer L-BFGS.
+  - Inference: about 40 ms for all 20k nodes on CPU; WSS by autodiff +2.5 ms.
 
 ## 9. Tests (`python -m pytest -q tests`, 9 tests)
 | Test | What it guarantees |

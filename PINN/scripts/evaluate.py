@@ -16,5 +16,6 @@ if __name__ == "__main__":
     ap.add_argument("--run", required=True, help="run directory containing model.pt")
     ap.add_argument("--data-dir", default=None, help="override the CFD dataset folder")
     ap.add_argument("--no-plots", action="store_true")
+    ap.add_argument("--device", default=None, help="cpu | cuda (default: the training device, if available)")
     a = ap.parse_args()
-    evaluate(a.run, a.data_dir, plots=not a.no_plots)
+    evaluate(a.run, a.data_dir, plots=not a.no_plots, device=a.device)

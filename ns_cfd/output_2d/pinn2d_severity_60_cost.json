@@ -1,0 +1,46 @@
+{
+  "kind": "cfd",
+  "total_wall_s": 85.93761730194092,
+  "total_cpu_s": 85.07259595099998,
+  "stages": {
+    "mesh": {
+      "wall_s": 0.061866983014624566,
+      "cpu_s": 0.060641969000016616,
+      "calls": 1
+    },
+    "plot": {
+      "wall_s": 3.6689742460730486,
+      "cpu_s": 3.606809398999985,
+      "calls": 2
+    },
+    "solve": {
+      "wall_s": 81.6386182809947,
+      "cpu_s": 80.85467001999996,
+      "calls": 1
+    },
+    "export": {
+      "wall_s": 0.07187542098108679,
+      "cpu_s": 0.07118022999998175,
+      "calls": 2
+    },
+    "post": {
+      "wall_s": 0.06450274598319083,
+      "cpu_s": 0.06389802500001451,
+      "calls": 1
+    }
+  },
+  "peak_rss_mb": 1200.0234375,
+  "counters": {
+    "n_steps": 9,
+    "n_dofs": 181453,
+    "t_end": 0.0,
+    "steady": true
+  },
+  "cpu_model": "AMD Ryzen 7 PRO 5850U with Radeon Graphics",
+  "gpu": null,
+  "threads_env": {
+    "OMP_NUM_THREADS": "1",
+    "MKL_NUM_THREADS": "1",
+    "OPENBLAS_NUM_THREADS": "1"
+  }
+}

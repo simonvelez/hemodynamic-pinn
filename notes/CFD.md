@@ -14,11 +14,16 @@ Its job is to produce reference blood-flow fields for training and testing the P
 | `generate_dataset_2d.py` | **in use** | Command-line driver: mesh → solve → export `.npz` + field plot + **mesh sheet** for each severity |
 | `mesh_plots.py` | **in use** | Mesh inspection: element quality and the one-page mesh troubleshooting sheet |
 | `mesh_study.py`, `mesh_study/` | **in use** | Mesh-independence study (§9) and its results |
-| `output_2d/` | data | Datasets at Re ≈ 301 (u_max = 0.2 m/s), severities 20–50 %, `crossed` mesh |
-| `output_2d_re150/` | data | Datasets at Re ≈ 150 (u_max = 0.1 m/s), severities 20–60 %, `crossed` mesh |
+| `stability_test.py`, `stability/` | **in use** | Disturbance test of the symmetric flow (§9) |
+| `wall_shear.py` | **in use** | Wall shear stress (element-wise ∇u, analytic wall normal) and recirculation length from WSS sign changes |
+| `verify_poiseuille.py`, `verification/` | **in use** | Exact-solution check in the straight channel (§11) |
+| `tests/` | **in use** | `python -m pytest -q tests`: Poiseuille checks (P2/P1 exact to round-off; legacy outlet defect detected) |
+| `output_2d/` | data | Datasets at Re ≈ 301 (u_max = 0.2 m/s), severities 20–50 %, `crossed` mesh, **P2/P1, steady solve** (regenerated 2026-11-08) |
+| `output_2d_re150/` | data | Datasets at Re ≈ 150 (u_max = 0.1 m/s), severities 20–60 %, same settings |
 
 Retired code and data live in `old/` (see `old/README.md`): the first 2D prototype, the 3D skeleton,
-`PINN_mvp`, and the first datasets made on the asymmetric `right`-diagonal mesh.
+`PINN_mvp`, the first datasets made on the asymmetric `right`-diagonal mesh, and the `crossed`-mesh
+datasets made with the original P1/P1 + symmetric-viscous scheme (`old/datasets_crossed_P1P1/`, see §11).
 
 Environment: conda env **`fenicsx-env`** (Python 3.11, DOLFINx 0.11, PETSc 3.25 with MUMPS).
 
@@ -92,7 +97,12 @@ Incompressible, Newtonian Navier–Stokes:
 | Re = ρ·u_max·D/μ | **≈ 301** (≈ 150 for u_max = 0.1) | ⚠ based on the *peak* velocity; the mean-velocity Re is 2/3 of this (≈ 201 / 100) |
 
 ### Discretisation
-- **Elements:** P1/P1 (equal-order) mixed velocity–pressure space. These are cheap, but they need stabilisation.
+> **Changed on 2026-11-08 (§11).** The default is now **Taylor–Hood P2/P1 without stabilisation**, the
+> viscous term is in **gradient form** μ∇u:∇v, and datasets use a **direct steady Newton solve**.
+> The original scheme described below is still available as `element="P1P1", viscous_form="sym"`
+> (the mesh-study and stability-test tags without a scheme suffix refer to it).
+
+- **Elements (original):** P1/P1 (equal-order) mixed velocity–pressure space. These are cheap, but they need stabilisation.
 - **Stabilisation:** SUPG + PSPG + LSIC (residual-based, Tezduyar-type):
   - τ_M = [(2/Δt)² + (2|u|/h)² + (4ν/h²)²]^(−1/2), and τ_C = h|u|/2.
   - The LSIC term is multiplied by ρ. This fixes the original prototype, where the missing ρ made LSIC about 1000× too weak.
@@ -107,7 +117,7 @@ Incompressible, Newtonian Navier–Stokes:
 |---|---|---|
 | Inlet (x = 0) | Parabolic Poiseuille profile u = u_max(1 − (y/R)²), **ramped** as ½(1 − cos(πt/t_ramp)), t_ramp = 0.1 s | Avoids the impulsive start of the prototype, which needs more Newton iterations and gives unphysical transients |
 | Walls | No-slip u = 0 | Rigid vessel |
-| Outlet (x = L) | "Do-nothing" (traction-free, so p ≈ 0) + backflow stabilisation −½ρ·min(u·n, 0)·(u·v) | No pressure Dirichlet condition is needed. The backflow term prevents blow-up if a vortex reaches the outlet |
+| Outlet (x = L) | "Do-nothing" (the natural condition of the weak form) + backflow stabilisation −½ρ·min(u·n, 0)·(u·v) | No pressure Dirichlet condition is needed. The backflow term prevents blow-up if a vortex reaches the outlet. **With the gradient-form viscous term the natural condition is −p n + μ ∂u/∂n = 0, satisfied exactly by fully developed outflow with p = 0. With the original symmetric form it is σ·n = 0, which Poiseuille flow violates (§11)** |
 
 ### Nonlinear / linear solver
 - Monolithic Newton through DOLFINx `NonlinearProblem` (PETSc SNES `newtonls`, basic line search).
@@ -347,7 +357,156 @@ looked steady because the symmetric mesh never disturbs it. To test it:
 
 Results: `ns_cfd/stability/report/report.md` and `asymmetry_vs_time.png`. Mesh and field plots per case are in `ns_cfd/stability/plots/`.
 
+### Is the mesh asymmetric at the stenosis? (checked 2026-11-08)
+A direct check on the default `crossed` mesh at 65 %: every one of the 40,000 triangles, including
+all 6,400 in the stenosis region, has an exact mirror image about y = 0, and the nodes mirror to
+4e-19 m. The `right` mesh has **no** mirrored triangle. The symmetric solutions also stay
+symmetric to 1e-15 in every steady P2/P1 run. So the bending at 55 %+ (Re ≈ 301) and 65 %+ (Re ≈ 150)
+is not caused by the mesh: on this mesh a 0.4 % disturbance decays below the threshold and grows above it.
+This is the classical **Coandă / pitchfork bifurcation of planar channel expansions**: the symmetric
+solution still exists but becomes unstable above a critical Re (Cherdron, Durst & Whitelaw 1978;
+Sobey & Drazin 1986; Fearn, Mullin & Cliffe 1990). Axisymmetric tubes stay symmetric to much higher Re,
+so the bending is a property of the **planar** model, not of stenoses in general.
+
 ## 10. Known limitations / open items
 - Rigid walls, Newtonian blood, steady inflow. No pulsatile waveform yet; `--snapshot-every` makes a time-dependent dataset possible.
 - At high severities the off-centre jet still reaches the outlet. A longer domain (`--length 0.08`) would be needed there.
 - Re is quoted with the peak inlet velocity. State this clearly when comparing with literature, which often uses the mean velocity.
+
+## 11. Pressure correction (2026-11-08): outlet condition and pressure stabilisation
+
+**Trigger.** The advisor found the pressure results confusing and suspected an error, because the
+PINN pressure error (2–4 %) was much larger than the velocity error (0.2–0.7 %).
+
+**Diagnosis.** The equations were right: the interior gradient in a straight channel was 0.1 % from exact,
+and the 50 % throat pressure drop matches a Bernoulli estimate. Two **discretisation defects** were found
+with the exact Poiseuille solution (`verify_poiseuille.py`, s = 0, results in `verification/poiseuille.json`):
+
+| Variant | Mesh | max \|v\|/U | outlet p spread | Δp error | p rel-L2 |
+|---|---|---|---|---|---|
+| P1/P1 + symmetric viscous (original) | 125×20 / 250×40 | 3.4 % / 4.0 % | 0.05 / 0.20 Pa | −2.6 % / −1.3 % | 1.5 % / 1.1 % |
+| P1/P1 + gradient viscous | 125×20 / 250×40 | 0.29 % / 0.08 % | 0.04 / 0.016 Pa | −1.7 % / −0.8 % | 0.4 % / 0.17 % |
+| **P2/P1 + gradient viscous (new)** | 125×20 / 250×40 | **1e-15** | **1e-14 Pa** | **3e-14** | **1e-13** |
+
+(Steady solves. Time-marched P1/P1 gives somewhat smaller Δp errors, 0.6–1.4 %, because τ_M then contains the
+(2/Δt)² term. That Δt dependence was already visible in §9.)
+
+1. **Outlet (main defect).** The weak form 2μ ε(u):ε(v) has the natural condition σ·n = 0. Fully developed
+   flow has wall shear μ ∂u/∂y ≠ 0 at the outlet, so it cannot satisfy it. The solver then bends the flow
+   near the outlet (spurious v up to 4 % of u_max) and the outlet pressure is non-uniform
+   (−0.05 … +0.32 Pa across the section in every old dataset). The PINN imposed p = 0 uniformly there,
+   so **CFD and PINN were solving slightly different problems**. A 0.3 Pa offset is about 2.5 % of Δp,
+   the same size as the PINN pressure error. Fix: gradient form μ∇u:∇v (valid because ∇·u = 0).
+   Its natural condition −p n + μ ∂u/∂n = 0 is satisfied exactly by Poiseuille outflow with p = 0.
+2. **PSPG inconsistency.** For P1 the viscous term of the strong residual vanishes, so PSPG penalises the
+   true pressure gradient wherever it balances viscosity (Poiseuille regions). That gives errors of about 0.1–0.3 Pa
+   at the inlet and outlet, Δp about 1 % low, and the very low observed GCI order for Δp (p ≈ 0.3–0.4) in §9.
+   Fix: Taylor–Hood P2/P1, which is inf-sup stable and needs no pressure stabilisation (guide §5.1).
+
+**Effect on the stenosis cases** (250×40; old dataset vs new P2/P1 steady):
+Δp changes by −0.9 % to +1.1 % (50 %: 23.12 → 22.87 Pa, matching the old study's Richardson-extrapolated
+22.9 Pa). The pressure field changes by 0.9–3.2 % rel-L2 and the velocity by 0.2–0.5 %. **The old CFD reference
+pressure was itself off by about as much as the PINN error**, so part of the "PINN pressure error" was reference error.
+
+**New P2/P1 mesh study** (steady, `crossed`; `mesh_study/report/report.md`, "P2/P1" sections):
+
+| | 25 % Re≈301 | 50 % Re≈301 | 60 % Re≈150 |
+|---|---|---|---|
+| observed order, Δp | 1.97 | 1.94 | 1.93 (old: 0.3–0.4) |
+| GCI Δp on 250×40 | 0.03 % | 0.25 % | 0.35 % (old: 1.1–1.6 %) |
+| 250×40 vs 500×80, velocity / pressure | 0.01 / 0.04 % | 0.06 / 0.24 % | 0.08 / 0.25 % |
+| recirculation length GCI on 250×40 | – | 13 % | 10 % |
+| wall time 125×20 / 250×40 / 500×80 | 5 s / 25 s / 2 min | | |
+
+The solution is now in the asymptotic range. 250×40 stays the production mesh. For recirculation length
+and WSS-type quantities use 500×80 (2 min per case), as before.
+
+**Steady solve.** `steady_solve=True` solves the steady equations directly by Newton with continuation in
+the inlet amplitude (typically 3 levels and 9–11 Newton iterations). On 125×20 at 50 % it matches the
+time-marched P2/P1 solution to 6e-6 (velocity) and 7e-5 (pressure), in 6 s instead of 233 s. Time-marching a
+steady problem is the "weak baseline" the guide warns against (§5.5), so this is also the CFD side of the
+cost comparison. Caveat: Newton also converges to the *unstable* symmetric solution above the bifurcation,
+so steady solves must stay inside the stable range established by `stability_test.py`.
+
+**Pressure plots.** Pressure is gauge pressure (outlet = 0), so negative values behind the throat are the
+physical pressure minimum and partial recovery. Plots now use a diverging colormap centred at 0. The PINN
+evaluation adds centreline and wall p(x) curves plus WSS (`pressure_lines_severity_XX.png`) and
+gauge-independent pressure metrics (mean-removed L2; RMS, max and offset error in units of Δp).
+
+**Datasets** were regenerated with P2/P1 + gradient form + steady solve. The new exports add the
+wall shear stress (`wall_idx`, `tau_w`), QoIs (peak WSS, separation/reattachment, recirculation length),
+and per-case `_run_manifest.json` / `_cost.json`. The old ones are in `old/datasets_crossed_P1P1/`.
+**Stability thresholds re-checked with P2/P1** (`stability/report/report.md`, P2P1/grad rows; 125×20,
+same nodes as the P1 250×40 runs; ~20 min per case):
+
+| Re | Severity | σ P1/P1 (original) | σ P2/P1 (corrected) | Verdict |
+|---|---|---|---|---|
+| ≈ 301 | 50 % | −1.91 | −2.25 | stable |
+| ≈ 301 | 55 % | +0.86 | +0.53 | **unstable** |
+| ≈ 150 | 60 % | −1.17 | −1.34 | stable |
+| ≈ 150 | 65 % | +0.85 | +0.68 | **unstable** |
+
+The critical severities do not move (50–55 % at Re ≈ 301, 60–65 % at Re ≈ 150), so the PINN training
+ranges stay. The bifurcation is a property of the flow, not of the discretisation.
+
+## 12. Severity sweep 30–70 % and branch selection (2026-11-08)
+
+The CFD datasets now cover the literature range 30–70 % at both Re (the old 20 %/25 % cases are kept).
+Above the planar symmetry-breaking threshold the symmetric steady state is unstable, so the plain
+steady Newton solve (which stays symmetric on the mirror-symmetric mesh) would return a non-physical
+state. `solver_2d.run_simulation(..., steady_solve=True, asym_eps=0.3)` instead:
+
+1. continues the inlet amplitude 0 → 1 with a small transverse body force
+   f_y = eps·ρ·u_max²/R on 0.01 ≤ x ≤ 0.02 m (throat to ~2.5 D downstream), then
+2. continues eps → 0 (Newton, adaptive step).
+
+Below the threshold this returns to the symmetric solution (symmetry error 1e-14–1e-9, Δp identical
+to the previous datasets); above it, it lands on the stable bent-jet steady state. The result does not
+depend on eps (0.3 and 1.0 give the same state at 65 %), and the centreline asymmetry matches the
+saturated perturbed transient runs on the same 125×20 P2/P1 mesh to 3 digits (65 %/70 % Re≈301:
+0.2374/0.3908 Newton vs 0.237/0.391 transient; 70 % Re≈150: 0.2570 vs 0.257).
+
+P2/P1 stability runs at 65 % Re≈301 (σ = +4.47/s), 70 % Re≈301 (+1.95/s) and 70 % Re≈150 (+2.55/s; still
+slowly evolving at 6 s) are all unstable, as with P1/P1 (`ns_cfd/stability/report/report.md`).
+`generate_dataset_2d.py --asym-eps 0.3` is the default; each case gets `meta["branch"]`
+(`symmetric` if symmetry error < 1e-6, else `asymmetric`). Tests: `ns_cfd/tests/test_branch.py`.
+
+| Re | symmetric (PINN range) | asymmetric (CFD only) |
+|---|---|---|
+| ≈301 | 20–50 % | 55, 60, 65, 70 % (Δp 28.8, 38.8, 55.4, 84.8 Pa) |
+| ≈150 | 20–60 % | 65, 70 % (Δp 18.2, 25.7 Pa) |
+
+This matches the stability test exactly. The PINN loader (`PINN/pinn/data.py`) skips `asymmetric`
+cases, so the PINN is only trained and tested on stable symmetric flows.
+
+Caveats for the asymmetric cases: the jet can bend either way (the sign here is set by the
+imperfection: towards +y); recirculation QoIs in `meta["qoi"]` are for the upper wall only, which is no
+longer representative of both walls; the bent steady state was checked against transient runs on 125×20 P2/P1
+(the datasets use 250×40). The cost study keeps `asym_eps=0` (all its cases are below the threshold).
+
+### Root-cause audit of the asymmetry (2026-11-08)
+
+Question: model, implementation or mesh? Checks (scripts in the session scratchpad; all P2/P1 steady with
+the imperfection continuation unless stated):
+
+| Check | Result |
+|---|---|
+| Mesh nodes, triangles, boundary tags mirror-symmetric (55 %, 70 %, 250×40) | yes: 40000/40000 triangles, all inlet/outlet/wall facets |
+| Inlet profile, BCs, weak form (`solver_2d.py`) | symmetric: parabolic inlet in y/R, no-slip both walls, do-nothing outlet, no y-biased terms |
+| Plain steady solve / unperturbed transient on the symmetric mesh | stays symmetric to 1e-15 even when unstable (nothing seeds the mode) |
+| Threshold vs downstream length (50 → 100 mm) | unchanged (55 % Re≈301 asym 0.0656 both) |
+| Threshold vs upstream length (2 D → 6 D) | unchanged |
+| Threshold vs mesh (125×20 → 250×40) and element (P1/P1 vs P2/P1) | unchanged (asym 0.066 → 0.071) |
+| Re scan at 70 % | symmetric up to Re 75, bent from Re 100 (Re on D and u_max) |
+| Re scan at 50 % | symmetric up to Re 400, bent at Re 500 |
+
+Conclusion: it is a property of the **planar 2D model** (Navier–Stokes in a symmetric channel expansion
+has a supercritical pitchfork: Cherdron, Durst & Whitelaw 1978; Sobey & Drazin 1986; Fearn, Mullin &
+Cliffe 1990), not of the implementation or the mesh. The old `right`-diagonal mesh only *seeded* the
+unstable mode; it did not create it. Order-of-magnitude check: Fearn et al. report Re_c ≈ 40 for a
+1:3 sudden expansion (Re on upstream half-width and centreline velocity); the same definition here gives
+Re_c ≈ 38–50 for 70 % (expansion ratio 3.3). An axisymmetric tube at the same severity loses symmetry
+only at Re_c ~ 400–2350 (guide §4.3, Griffith 2008) and not as a steady jet bend.
+
+Implication for the guide: its laminar guard (Re_peak ≤ 250 for DS ≤ 60 %, ≤ 150 for DS ≥ 70 %) comes
+from axisymmetric thresholds and does not protect a planar model: planar Re_c at 70 % is ≈ 75–100.

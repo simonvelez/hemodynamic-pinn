@@ -16,8 +16,8 @@ class PINN(nn.Module):
                  omega0=30.0, fourier_features=0, fourier_sigma=1.0, seed=0):
         super().__init__()
         # Affine map of the physical input box to [-1, 1]^3 (stored with the model).
-        self.register_buffer("lower", torch.as_tensor(lower, dtype=torch.float32))
-        self.register_buffer("upper", torch.as_tensor(upper, dtype=torch.float32))
+        self.register_buffer("lower", torch.as_tensor(lower, dtype=torch.get_default_dtype()))
+        self.register_buffer("upper", torch.as_tensor(upper, dtype=torch.get_default_dtype()))
         self.activation, self.omega0 = activation, omega0
 
         gen = torch.Generator().manual_seed(seed)

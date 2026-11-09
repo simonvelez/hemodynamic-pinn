@@ -1,0 +1,26 @@
+[batch] 12 done, 3 to run with 3 workers
+[batch] OK  s65_u20_125x20_crossed_eps010_P2P1grad | [run] s65_u20_125x20_crossed_eps010_P2P1grad: 22 min | sigma=+4.474 1/s | a_final=2.37e-01 | sym_err=8.8e-01 | UNSTABLE (grows)
+[batch] OK  s70_u20_125x20_crossed_eps010_P2P1grad | [run] s70_u20_125x20_crossed_eps010_P2P1grad: 23 min | sigma=+1.949 1/s | a_final=3.91e-01 | sym_err=9.1e-01 | UNSTABLE (grows)
+[batch] OK  s70_u10_125x20_crossed_eps010_P2P1grad | [run] s70_u10_125x20_crossed_eps010_P2P1grad: 24 min | sigma=+2.546 1/s | a_final=2.57e-01 | sym_err=7.0e-01 | UNSTABLE (grows)
+[batch] finished: 3 ok, 0 failed
+# Stability of the symmetric 2D stenosis flow
+
+Antisymmetric inlet perturbation eps = 0.01 (peak ≈ 0.4% of u_max) for t < 0.2 s, then symmetric inlet; mesh 250×40 crossed (P1P1) or 125×20 crossed (P2P1); growth rate σ = late-time slope of log a(t) (after the post-perturbation minimum, 1e-12 < a < 0.05). Runs stop as 'steady' after 3.0 s if the change per step is < 1e-6, so slowly growing cases end before saturating.
+
+| Re | severity | scheme | σ (1/s) | max a(t) | final a | final symmetry err | steady | t_end (s) | verdict |
+|---|---|---|---|---|---|---|---|---|---|
+| ≈301 | 50% | P1P1/sym | -1.908 | 3.29e-03 | 1.53e-07 | 9.1e-07 | True | 3.00 | **stable (decays)** |
+| ≈301 | 55% | P1P1/sym | +0.863 | 3.29e-03 | 2.01e-05 | 1.1e-04 | True | 3.00 | **UNSTABLE (grows)** |
+| ≈301 | 60% | P1P1/sym | +3.210 | 4.29e-03 | 6.31e-05 | 2.4e-04 | True | 3.00 | **UNSTABLE (grows)** |
+| ≈301 | 65% | P1P1/sym | +4.599 | 4.02e-01 | 2.46e-01 | 9.0e-01 | True | 4.85 | **UNSTABLE (grows)** |
+| ≈301 | 70% | P1P1/sym | +2.061 | 6.93e-01 | 4.32e-01 | 9.2e-01 | True | 4.59 | **UNSTABLE (grows)** |
+| ≈150 | 60% | P1P1/sym | -1.172 | 3.61e-03 | 9.92e-07 | 3.8e-06 | True | 3.00 | **stable (decays)** |
+| ≈150 | 65% | P1P1/sym | +0.852 | 3.61e-03 | 2.66e-04 | 9.1e-04 | True | 3.00 | **UNSTABLE (grows)** |
+| ≈150 | 70% | P1P1/sym | +2.707 | 2.83e-01 | 2.66e-01 | 7.2e-01 | False | 6.00 | **UNSTABLE (grows)** |
+| ≈301 | 50% | P2P1/grad | -2.250 | 3.23e-03 | 1.02e-07 | 6.1e-07 | True | 3.00 | **stable (decays)** |
+| ≈301 | 55% | P2P1/grad | +0.530 | 3.23e-03 | 5.64e-05 | 3.1e-04 | True | 3.00 | **UNSTABLE (grows)** |
+| ≈301 | 65% | P2P1/grad | +4.474 | 3.65e-01 | 2.37e-01 | 8.8e-01 | True | 4.89 | **UNSTABLE (grows)** |
+| ≈301 | 70% | P2P1/grad | +1.949 | 6.45e-01 | 3.91e-01 | 9.1e-01 | True | 4.80 | **UNSTABLE (grows)** |
+| ≈150 | 60% | P2P1/grad | -1.343 | 3.39e-03 | 4.68e-07 | 1.8e-06 | True | 3.00 | **stable (decays)** |
+| ≈150 | 65% | P2P1/grad | +0.675 | 3.39e-03 | 1.51e-04 | 5.2e-04 | True | 3.00 | **UNSTABLE (grows)** |
+| ≈150 | 70% | P2P1/grad | +2.546 | 2.60e-01 | 2.57e-01 | 7.0e-01 | False | 6.00 | **UNSTABLE (grows)** |

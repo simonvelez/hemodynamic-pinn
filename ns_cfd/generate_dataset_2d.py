@@ -1,11 +1,13 @@
 """2D CFD -> PINN dataset pipeline.
 
     conda activate fenicsx-env
-    python generate_dataset_2d.py                      # 25/50/75 % severities
+    python generate_dataset_2d.py                      # 30-70 % severities (literature range)
     python generate_dataset_2d.py --severities 0.5 --nx 300 --ny 48
 
 For each severity writes to ./output_2d/:
-    pinn2d_severity_XX.npz   nodal x, y, u, v, p, boundary flag, triangles, metadata
+    pinn2d_severity_XX.npz   nodal x, y, u, v, p, boundary flag, triangles, wall shear stress
+                             (wall_idx, tau_w), metadata (incl. qoi: dp, peak WSS, recirculation)
+    pinn2d_severity_XX_run_manifest.json / _cost.json   provenance and stage timings
     pinn2d_severity_XX.png   velocity-magnitude and pressure fields
     pinn2d_severity_XX_mesh.png  mesh troubleshooting sheet (tags, quality, spacing)
 
@@ -15,6 +17,7 @@ Runs in serial (the meshes are small; the export relies on serial dof ordering).
 import argparse
 import json
 import os
+import sys
 
 # Threaded BLAS inside MUMPS oversubscribes the CPU on these small systems
 # (observed ~9x CPU time vs wall time); default to 1 thread unless overridden.
@@ -28,6 +31,10 @@ from dolfinx import fem
 from mesh_2d import INLET_TAG, OUTLET_TAG, WALL_TAG, build_stenosis_mesh
 from mesh_plots import mesh_arrays, plot_mesh
 from solver_2d import run_simulation
+from wall_shear import wall_qois, wall_shear_stress
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "common"))
+from manifest import RunLog  # noqa: E402
 
 # Node flags stored in the dataset
 INTERIOR, INLET, OUTLET, WALL = 0, 1, 2, 3
@@ -73,14 +80,18 @@ def plot_case(path, xy, uv, p, triangles, severity):
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     import matplotlib.tri as mtri
+    from matplotlib.colors import TwoSlopeNorm
 
     tri = mtri.Triangulation(xy[:, 0] * 1e3, xy[:, 1] * 1e3, triangles)
     fig, axes = plt.subplots(2, 1, figsize=(12, 4.5), dpi=150, sharex=True)
-    for ax, field, label, cmap in (
-        (axes[0], np.linalg.norm(uv, axis=1), "|u| (m/s)", "inferno"),
-        (axes[1], p, "p (Pa)", "viridis"),
+    # Gauge pressure (outlet = 0): diverging map centred at 0, so the low-pressure
+    # zone behind the throat (blue) is visibly below the outlet pressure.
+    p_norm = TwoSlopeNorm(0.0, min(p.min(), -1e-9), max(p.max(), 1e-9))
+    for ax, field, label, cmap, kw in (
+        (axes[0], np.linalg.norm(uv, axis=1), "|u| (m/s)", "inferno", {}),
+        (axes[1], p, "gauge p (Pa, outlet = 0)", "RdBu_r", dict(norm=p_norm)),
     ):
-        c = ax.tripcolor(tri, field, shading="gouraud", cmap=cmap)
+        c = ax.tripcolor(tri, field, shading="gouraud", cmap=cmap, **kw)
         fig.colorbar(c, ax=ax, label=label, pad=0.01)
         ax.set_aspect("equal")
         ax.set_ylabel("y (mm)")
@@ -91,34 +102,61 @@ def plot_case(path, xy, uv, p, triangles, severity):
     plt.close(fig)
 
 
-def run_case(severity, args):
-    domain, facet_tags = build_stenosis_mesh(
-        severity=severity, length=args.length, radius=args.radius,
-        x_center=args.x_center, half_length=args.half_length, nx=args.nx, ny=args.ny,
-        diagonal=args.diagonal,
-    )
-    tag = f"severity_{int(round(severity * 100))}"
-    # Mesh troubleshooting sheet, written before solving so it exists even if the solve fails.
-    xy0, tri0, flag0 = mesh_arrays(domain, facet_tags)
-    geo = dict(severity=severity, length=args.length, radius=args.radius,
-               x_center=args.x_center, half_length=args.half_length)
-    mstats = plot_mesh(os.path.join(args.output_dir, f"pinn2d_{tag}_mesh.png"), xy0, tri0, flag0, geo,
-                       f"Mesh {args.nx}x{args.ny} ({args.diagonal}), severity {severity:.0%}")
-    u_h, p_h, info, snapshots = run_simulation(
-        domain, facet_tags, u_max=args.u_max, dt=args.dt, t_final=args.t_final,
-        steady_tol=args.steady_tol, snapshot_every=args.snapshot_every,
-    )
+SYMMETRIC_TOL = 1e-6   # symmetry_error below this -> symmetric branch
 
-    xy, uv, p, flag, triangles = nodal_arrays(domain, facet_tags, u_h, p_h)
+
+def run_case(severity, args):
+    tag = f"severity_{int(round(severity * 100))}"
+    rlog = RunLog(args.output_dir, kind="cfd", prefix=f"pinn2d_{tag}_",
+                  config=dict(vars(args), severity=severity))
+    with rlog.stage("mesh"):
+        domain, facet_tags = build_stenosis_mesh(
+            severity=severity, length=args.length, radius=args.radius,
+            x_center=args.x_center, half_length=args.half_length, nx=args.nx, ny=args.ny,
+            diagonal=args.diagonal,
+        )
+    # Mesh troubleshooting sheet, written before solving so it exists even if the solve fails.
+    with rlog.stage("plot"):
+        xy0, tri0, flag0 = mesh_arrays(domain, facet_tags)
+        geo = dict(severity=severity, length=args.length, radius=args.radius,
+                   x_center=args.x_center, half_length=args.half_length)
+        mstats = plot_mesh(os.path.join(args.output_dir, f"pinn2d_{tag}_mesh.png"), xy0, tri0, flag0, geo,
+                           f"Mesh {args.nx}x{args.ny} ({args.diagonal}), severity {severity:.0%}")
+    with rlog.stage("solve"):
+        u_h, p_h, info, snapshots = run_simulation(
+            domain, facet_tags, u_max=args.u_max, dt=args.dt, t_final=args.t_final,
+            steady_tol=args.steady_tol, snapshot_every=args.snapshot_every,
+            element=args.element, viscous_form=args.viscous_form,
+            steady_solve=(args.solve == "steady"),
+            asym_eps=args.asym_eps if args.solve == "steady" else 0.0,
+        )
+    rlog.counters.update(n_steps=info["steps"], n_dofs=info.get("n_dofs"), t_end=info["t_end"],
+                         steady=info["steady"])
+
+    with rlog.stage("export"):
+        xy, uv, p, flag, triangles = nodal_arrays(domain, facet_tags, u_h, p_h)
     info["symmetry_error"] = symmetry_error(xy, uv)
+    # Stable symmetric solutions are mirror-symmetric to round-off (~1e-12); the bent-jet
+    # branch (planar Coanda bifurcation) is O(1e-2) or more. PINN training uses only "symmetric".
+    info["branch"] = "symmetric" if info["symmetry_error"] < SYMMETRIC_TOL else "asymmetric"
     info["u_max_field"] = float(np.linalg.norm(uv, axis=1).max())
     info["geometry"] = dict(severity=severity, length=args.length, radius=args.radius,
                             x_center=args.x_center, half_length=args.half_length,
                             nx=args.nx, ny=args.ny, diagonal=args.diagonal)
     info["mesh"] = mstats
 
+    # Wall shear stress at the wall nodes (signed; Pa) and upper-wall QoIs.
+    with rlog.stage("post"):
+        wall_idx = np.flatnonzero(flag == WALL)
+        tau_w = wall_shear_stress(domain, u_h, info["params"]["mu"], xy[wall_idx],
+                                  dict(severity=severity, radius=args.radius, x_center=args.x_center,
+                                       half_length=args.half_length))
+        info["qoi"] = dict(dp_pa=float(info["dp"]), **wall_qois(xy[wall_idx, 0], xy[wall_idx, 1], tau_w,
+                                                                args.x_center))
+
     data = dict(x=xy[:, 0], y=xy[:, 1], u=uv[:, 0], v=uv[:, 1], p=p,
-                flag=flag, triangles=triangles, meta=json.dumps(info))
+                flag=flag, triangles=triangles, wall_idx=wall_idx, tau_w=tau_w,
+                meta=json.dumps(info, default=float))
 
     snaps = list(snapshots())
     if snaps:
@@ -128,18 +166,25 @@ def run_case(severity, args):
         data["v_snap"] = np.stack([f[1][:, 1] for f in fields])
         data["p_snap"] = np.stack([f[2] for f in fields])
 
-    np.savez_compressed(os.path.join(args.output_dir, f"pinn2d_{tag}.npz"), **data)
-    plot_case(os.path.join(args.output_dir, f"pinn2d_{tag}.png"), xy, uv, p, triangles, severity)
+    with rlog.stage("export"):
+        np.savez_compressed(os.path.join(args.output_dir, f"pinn2d_{tag}.npz"), **data)
+    with rlog.stage("plot"):
+        plot_case(os.path.join(args.output_dir, f"pinn2d_{tag}.png"), xy, uv, p, triangles, severity)
+    rlog.finish(metrics=dict(mass_error=info["mass_error"], symmetry_error=info["symmetry_error"],
+                             **info["qoi"]))
 
     print(f"[dataset] {tag}: {len(xy)} nodes | steady={info['steady']} t_end={info['t_end']:.3f}s | "
           f"mass err={info['mass_error']:.1e} | dp={info['dp']:.2f} Pa | "
-          f"max|u|={info['u_max_field']:.3f} m/s | symmetry err={info['symmetry_error']:.1e}", flush=True)
+          f"max|u|={info['u_max_field']:.3f} m/s | symmetry err={info['symmetry_error']:.1e} | "
+          f"branch={info['branch']} | peak WSS={info['qoi']['wss_peak_pa']:.2f} Pa | L_recirc={info['qoi']['recirc_len'] * 1e3:.2f} mm",
+          flush=True)
     return info
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--severities", type=float, nargs="+", default=[0.25, 0.50, 0.75])
+    ap.add_argument("--severities", type=float, nargs="+",
+                    default=[0.30, 0.35, 0.40, 0.45, 0.50, 0.55, 0.60, 0.65, 0.70])
     ap.add_argument("--output-dir", default="./output_2d")
     ap.add_argument("--length", type=float, default=0.05)
     ap.add_argument("--radius", type=float, default=0.0025)
@@ -148,6 +193,18 @@ def main():
     ap.add_argument("--nx", type=int, default=250)
     ap.add_argument("--ny", type=int, default=40)
     ap.add_argument("--diagonal", default="crossed", help="triangle split: crossed (symmetric) | right | left")
+    ap.add_argument("--element", default="P2P1", choices=["P2P1", "P1P1"],
+                    help="P2P1 Taylor-Hood (default) | P1P1 + SUPG/PSPG/LSIC (legacy, cheaper)")
+    ap.add_argument("--viscous-form", default="grad", choices=["grad", "sym"],
+                    help="grad: Poiseuille-compatible do-nothing outlet (default) | sym: legacy")
+    ap.add_argument("--solve", default="steady", choices=["steady", "transient"],
+                    help="steady: direct Newton + continuation (default, seconds); transient: time-march "
+                         "to steady state (needed for --snapshot-every; stays on the symmetric branch on the "
+                         "symmetric mesh, so check stability_test.py above the bifurcation)")
+    ap.add_argument("--asym-eps", type=float, default=0.3,
+                    help="steady solve: symmetry-breaking imperfection continued to 0, so the result is the "
+                         "physically stable steady state (bent jet above the bifurcation, symmetric below). "
+                         "0 = plain symmetric continuation (returns the unstable symmetric state above it)")
     ap.add_argument("--u-max", type=float, default=0.2)
     ap.add_argument("--dt", type=float, default=0.002)
     ap.add_argument("--t-final", type=float, default=2.0)
@@ -159,6 +216,8 @@ def main():
     if MPI.COMM_WORLD.size > 1:
         raise SystemExit("Run in serial: the export assumes a single process.")
     os.makedirs(args.output_dir, exist_ok=True)
+    if args.snapshot_every and args.solve == "steady":
+        raise SystemExit("--snapshot-every needs --solve transient")
 
     for s in args.severities:
         print(f"\n===== severity {int(round(s * 100))}% =====", flush=True)

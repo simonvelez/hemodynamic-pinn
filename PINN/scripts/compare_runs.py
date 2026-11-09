@@ -15,7 +15,8 @@ from pathlib import Path
 
 import numpy as np
 
-COLS = [("l2_vel", "vel L2"), ("l2_p", "p L2"), ("dp_rel_err", "Δp err")]
+COLS = [("l2_vel", "vel L2"), ("l2_p", "p L2"), ("p_rms_over_dp", "p RMS/Δp"), ("dp_rel_err", "Δp err"),
+        ("l2_wss", "WSS L2")]   # metrics missing from older runs are shown as "–"
 
 
 def load(run):
@@ -56,7 +57,7 @@ def main():
         cells = []
         for k in groups:
             for key, _ in COLS:
-                vals = [m[s][key] for m in data[k] if s in m]
+                vals = [m[s][key] for m in data[k] if s in m and m[s].get(key) is not None]
                 cells.append(fmt(vals) if vals else "–")
         lines.append(f"| {s:.2f} | {'**test**' if split == 'test' else split} | " + " | ".join(cells) + " |")
     # overall means per split
@@ -64,8 +65,10 @@ def main():
         cells = []
         for k in groups:
             for key, _ in COLS:
-                per_run = [np.mean([m[s][key] for s in m if m[s]["split"] == split]) for m in data[k]]
-                cells.append(fmt(per_run))
+                per_run = [[m[s][key] for s in m if m[s]["split"] == split and m[s].get(key) is not None]
+                           for m in data[k]]
+                per_run = [np.mean(v) for v in per_run if v]
+                cells.append(fmt(per_run) if per_run else "–")
         lines.append(f"| mean | {split} | " + " | ".join(cells) + " |")
     text = "\n".join(lines)
     print(text)
