@@ -510,3 +510,87 @@ only at Re_c ~ 400–2350 (guide §4.3, Griffith 2008) and not as a steady jet b
 
 Implication for the guide: its laminar guard (Re_peak ≤ 250 for DS ≤ 60 %, ≤ 150 for DS ≥ 70 %) comes
 from axisymmetric thresholds and does not protect a planar model: planar Re_c at 70 % is ≈ 75–100.
+
+## 13. Comparison with a labmate's solver (Zuluaga 2026)
+
+Source: `thesis_docs/Documento trabajo de grado Juan Jose Zuluaga version final_compressed.pdf` and
+github.com/JuanJoZP/cfd-hemodynamic (`src/scenarios/stenosis_pressure_structured.py`,
+`src/solvers/stabilized_schur_pressure_backflow.py`; code read through summaries, confirm details at source).
+
+**Both models are planar 2D** (channel in x, y; walls at y = R_in ± r(x)); neither is axisymmetric. His
+"radially symmetric" structured mesh (gmsh transfinite + recombine → quads, even cell count across) is
+mirror-symmetric about the centreline: the same property as our `crossed` mesh. Severity
+R_min = (1 − η) R is the same definition as ours.
+
+| | Zuluaga | ours |
+|---|---|---|
+| equations | incompressible NS, Newtonian, ρ 1060, μ 3.5 mPa s | same (ρ 1055) |
+| time / nonlinear | implicit midpoint + Newton, dt 1e-4 s, from rest | same in transient mode; datasets use direct steady Newton |
+| elements | P1/P1 + SUPG/PSPG/LSIC (LSIC with Tezduyar z factor) | P2/P1 Taylor–Hood (legacy P1/P1 identical to his) |
+| viscous term | symmetric 2μ ε(u):ε(v) | gradient μ ∇u:∇v (same interior equations) |
+| inlet | weak pressure (70 mmHg thesis, 80 code default) + Nitsche u_T = 0 | Dirichlet parabolic velocity |
+| outlet | weak pressure p = R·Q (explicit, damped) + backflow penalty | zero traction (do-nothing, grad form) |
+| flow rate | output (Re varies with severity) | input (Re fixed) |
+| geometry | linear taper 1.57 → 1.20 mm, cubic Bézier lesion (slope α), L = 138 mm | cosine lesion, no taper, L = 50 mm |
+
+Notes on his formulation:
+- The P1 PSPG residual drops the viscous term, the inconsistency that biased our Δp 1–2.6 % low (§11);
+  it would bias his FFR the same way.
+- His outlet prescribes a pressure, not σ·n = 0 with free shear, so it does not have our old outlet
+  defect A.
+- To ask him: the outlet pressure term carries a factor 0.5 in the code, and the inlet uses a halved
+  mmHg constant (`_MMHG_2D`). Since R_distal ≫ R_vessel these roughly cancel in Q, but they should be
+  explained.
+
+**Symmetry.** His Re ≈ 204 uses mean velocity and full height, which is ≈ our Re ≈ 301 case
+(Re_mean,H = 201). There our planar threshold is 50–55 %, so his η = 0.75 (expansion ratio 4) is far
+above it; the 21 % flow loss at 75 % does not change that. On Fearn et al.'s definition (half-width,
+centreline velocity) his Re ≈ 150, against Re_c ≈ 40 for a 1:3 expansion. On a mirror-symmetric mesh
+nothing seeds the antisymmetric mode, so the symmetric state persists even when unstable. This is what
+we see without perturbation (§9, §12). His symmetric-mesh result is reproducible only by a steady solve or a short transient (see the test below), and
+it is the unstable equilibrium; the bent, wall-attached steady jet on the unstructured mesh is the
+physical planar solution. "Laminar" does not imply "symmetric". The "Re < 500 stays symmetric" rule is
+from axisymmetric tubes (Griffith 2008; guide §4.3), and even there b = 0.9 gives Re_c ≈ 395 (75 % DS
+= 94 % AS). His FFR agreeing within 2 % between meshes is consistent: bending changed our local Δp by
+≈ 7 % at 65 %, which is diluted over a 138 mm vessel.
+
+**Our sanity checks:** straight channel dp/dx 223.7 vs exact 224.0 Pa/m; Poiseuille WSS 0.56 Pa exact
+(P2); throat mean velocity = U/(1 − s) by mass conservation (his +300 % at 75 % also matches the 4×);
+thresholds independent of domain length, mesh, element and solver.
+
+**Open item:** his TAWSS is 5–10× below a Poiseuille estimate at his stated flow (distal 4.8 dyn/cm² vs
+≈ 24 dyn/cm² at 280 mm/s, H 2.41 mm). This is partly from averaging from rest over 0.5 s, against a
+planar development time ≈ 0.7 s. His actual steady Q and Re decide how far above the threshold his
+75 % case is.
+
+### Stability test on his 75 % geometry (`zuluaga_check.py`, 2026-11-08)
+
+His tapered Bézier geometry (η 0.75; α 0.3 and 0.05) on our mirror-symmetric `crossed` mesh, 690×24
+(0.2 mm cells), P2/P1, his ρ/μ. His target flow is imposed as a parabolic inlet (Re_mean ≈ 204), with
+dt 2 ms. Outputs and table are in `ns_cfd/zuluaga_check/` (`report.md`).
+
+| run | result |
+|---|---|
+| steady Newton, no imperfection (α 0.3 / 0.05) | symmetric (asym 1e-14), Δp 552.9 / 1070.8 Pa |
+| steady Newton, imperfection 0.3 → 0 (α 0.3 / 0.05) | bent jet, asym 0.667 / 0.146, Δp 583.5 / 1083.3 Pa |
+| steady, α 0.3 at 78 % flow (Re 159, his flow-loss bound) | symmetric and bent branches both exist (asym 0.32) |
+| transient, perturbed 1 % for t < 0.2 s, α 0.05 | σ = +9.5 1/s → UNSTABLE, saturates on the bent branch |
+| transient, perturbed, α 0.3 | saturated before the fit window → UNSTABLE; ends at the Newton bent state |
+| **transient from rest, no perturbation, α 0.3 (his procedure)** | asym grows from round-off: 1e-15 → 4e-12 (0.4 s) → 1e-7 (1.0 s) → 1e-4 (1.4 s) → 0.34 (1.8 s); fitted σ = +18.2 1/s; ends at t 3.17 s on the Newton bent state (asym 0.667, Δp 583.5 Pa) |
+
+Conclusions:
+- On a perfectly mirror-symmetric mesh, the symmetric 75 % flow does **not** survive a long transient.
+  Round-off alone seeds the antisymmetric mode, and it grows ≈ e¹⁷ per second, so the flow is bent
+  after about 1.8 s of simulated time. Only a direct steady solve (or a short run) keeps it symmetric.
+  This corrects the "should be reproducible" expectation above.
+- The perturbed transients end exactly on the steady Newton bent states (same Δp, same asym), so the
+  branch continuation and the transient agree.
+- His symmetric result is therefore consistent with the unstable equilibrium seen only for a short time.
+  With his dt 1e-4 s, simulating ≲ 1 s, and SUPG/LSIC diffusion slowing growth, the symmetric state can
+  look converged before the mode reaches visible size. Ask him how long he simulated, and what
+  centreline v / asymmetry his final 75 % field has.
+- Bending changes Δp by only 1–5.5 % here (583.5 vs 552.9 Pa), consistent with his small FFR difference
+  between meshes.
+- The verdict is unchanged: the planar 75 % case is physically asymmetric. Our thresholds (50–55 % at
+  Re ≈ 301 ≈ his Re 204) hold on his geometry too, so switching our datasets to his geometry would not
+  make the high-severity cases symmetric.
