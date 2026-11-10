@@ -315,10 +315,11 @@ collocation sampling. "Physics-only" = the same configuration with `--lambda-dat
     more collocation near the throat, Fourier features or SIREN, hard BCs, float64 + longer L-BFGS.
   - Inference: about 40 ms for all 20k nodes on CPU; WSS by autodiff +2.5 ms.
 
-## 9. Tests (`python -m pytest -q tests`, 9 tests)
+## 9. Tests (`python -m pytest -q tests`, 15 tests)
 | Test | What it guarantees |
 |---|---|
-| `test_physics.py` | The exact Poiseuille solution gives zero residual (< 1e-12); a flipped pressure sign is detected; residuals backpropagate to the network weights |
+| `test_physics.py` | The exact Poiseuille solution gives zero residual (< 1e-12) and satisfies the traction outlet; a flipped pressure sign and an outlet pressure offset are detected; residuals backpropagate to the network weights. Guide L0 (2026-11-09): the WSS operator returns exactly 4/Re on both walls for Poiseuille (negative for reversed flow), and the autodiff residuals match central differences |
+| `test_metrics.py` | Area-weighted rel-L2 (`common/metrics.py`): lumped nodal areas sum to the lumen area; the metric is scale-invariant and reduces to the plain L2 for uniform weights |
 | `test_geometry.py` | The analytic wall `r(x, s)` matches CFD wall nodes to 1e-9; sampled points lie inside the lumen |
 | `test_data.py` | The nondimensional round-trip is exact; CFD inlet nodes carry the PINN's inlet profile; bifurcated cases are rejected; the train/test split leaks no held-out severity into the sensors |
 
@@ -332,3 +333,12 @@ collocation sampling. "Physics-only" = the same configuration with `--lambda-dat
 5. Improve the edges of the severity range (0.20 and 0.60 have the largest errors), for example with more collocation points or sensors near the range ends.
 6. The v-component relative L2 is large (5–17 %) because v ≈ 0 almost everywhere. Judge it by absolute error or by the velocity-vector L2.
 7. Extensions: pulsatile flow (time as an input, using CFD `--snapshot-every`), Re as a second parameter, and 3D (see `old/ns_cfd_3d/`).
+8. **2026-11-09 thesis-compliance review** (`docs/DEVIATIONS.md`, `docs/lab_to_fill_in.yaml`):
+   - `metrics.json` gains area-weighted `l2_vel_area` / `l2_p_area` (guide §7.3). The node-weighted `l2_*` keys are unchanged (D-009: choose the headline metric).
+   - `scripts/cfd_vs_pinn.py` joins the CFD cost study (`ns_cfd/cost_study/report/pareto.csv`) with the campaign runs. It gives the cheapest CFD configuration at the PINN's accuracy per case and quantity, and the break-even N*. Run it on the A4000 after `cost_study.py batch` + `report` and `campaign.py`.
+   - The cost study now includes 35 % at u_max 0.1, a held-out PINN test case.
+9. **2026-11-10 data-efficiency study: how many CFD runs does the PINN need?** (`scripts/campaign.py` group `ncases_*`, summary `scripts/data_efficiency.py`)
+   - Motivation: similar surrogate models are said to need 1,000–10,000 CFD runs. Purely data-driven surrogates over many geometric parameters do; a PINN with one parameter (severity) at fixed Re should not, because the Navier–Stokes residual fills in between the data.
+   - Design (Re ≈ 150): train with K = 1–5 CFD runs. K = 1: 0.40; K = 2: 0.20, 0.60; K = 3: 0.20, 0.40, 0.60; K = 4: 0.20, 0.30, 0.45, 0.60; K = 5: 0.20, 0.30, 0.40, 0.50, 0.60. 0.35 and 0.55 are held out in every run, so all K share a common test set; K = 7 is `base_re150_s*` and K = 0 is `physonly`. Physics always covers 0.20–0.60. Each K: hybrid × 3 seeds (`ncases_K{K}_s{seed}`) and data-only × 1 (`ncases_K{K}_dataonly`, `--lambda-pde 0`). That makes 20 runs, about 46 h on the laptop CPU, so they run on the A4000.
+   - Run: `python scripts/campaign.py --only ncases --device cuda`. The summary (`runs/campaign/data_efficiency.md` + `.png`) is written automatically, or run it with `python scripts/data_efficiency.py`. The break-even N* per K comes from `python scripts/cfd_vs_pinn.py --group K3=runs/campaign/ncases_K3_s* ...`.
+   - How to read it: if the hybrid stays near its K = 7 accuracy with 2–3 runs while data-only degrades, the physics is what replaces the large datasets. The claim covers one parameter at fixed Re only; every extra varying parameter (Re, lesion length, shape) multiplies the runs needed.

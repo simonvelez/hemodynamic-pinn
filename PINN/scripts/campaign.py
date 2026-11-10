@@ -23,6 +23,10 @@ Groups (Re ≈ 150 unless stated; default config otherwise, see pinn/config.py):
                   'extrap_physin'  physics still enforced over 0.20-0.60 (PINN advantage)
                   'extrap_physout' physics also restricted to 0.25-0.50 (pure extrapolation)
   f64             float64 throughout (precision check, guide §6.3)
+  ncases_K*       data-efficiency study: K = 1-5 CFD runs (severities) with data, 0.35 / 0.55 always
+                  held out, physics over 0.20-0.60. 'ncases_K{K}_s{seed}' hybrid (3 seeds),
+                  'ncases_K{K}_dataonly' without physics. K = 7 is base_re150_s*, K = 0 is physonly.
+                  Summary: scripts/data_efficiency.py
 """
 
 import argparse
@@ -35,6 +39,18 @@ ROOT = Path(__file__).resolve().parents[1]
 RUNS = ROOT / "runs" / "campaign"
 RE150 = ["--data-dir", "../ns_cfd/output_2d_re150", "--test-severities", "0.35", "0.55"]
 RE301 = ["--data-dir", "../ns_cfd/output_2d", "--test-severities", "0.35", "0.45"]
+# symmetric Re ≈ 150 cases (0.65 / 0.70 are the asymmetric branch and are never loaded)
+RE150_SYM = [0.20, 0.25, 0.30, 0.35, 0.40, 0.45, 0.50, 0.55, 0.60]
+COMMON_TEST = [0.35, 0.55]
+# training severities per number of CFD runs K (data-efficiency study)
+NCASES = {1: [0.40], 2: [0.20, 0.60], 3: [0.20, 0.40, 0.60], 4: [0.20, 0.30, 0.45, 0.60],
+          5: [0.20, 0.30, 0.40, 0.50, 0.60]}
+assert all(not set(v) & set(COMMON_TEST) and len(v) == k for k, v in NCASES.items())
+
+
+def ncases_flags(train):
+    test = [s for s in RE150_SYM if all(abs(s - t) > 1e-9 for t in train)]
+    return ["--data-dir", "../ns_cfd/output_2d_re150", "--test-severities", *[f"{s:.2f}" for s in test]]
 
 
 def campaign():
@@ -54,6 +70,10 @@ def campaign():
     runs["extrap_physin"] = ext
     runs["extrap_physout"] = ext + ["--physics-s-range", "0.25", "0.50"]
     runs["f64"] = RE150 + ["--dtype", "float64"]
+    for k, train in NCASES.items():
+        for seed in range(3):
+            runs[f"ncases_K{k}_s{seed}"] = ncases_flags(train) + ["--seed", str(seed)]
+        runs[f"ncases_K{k}_dataonly"] = ncases_flags(train) + ["--lambda-pde", "0"]
     return runs
 
 
@@ -101,6 +121,8 @@ def main():
                 args += ["--group", f"{label}={base / pattern}"]
         if "--group" in args:
             subprocess.run(args, cwd=ROOT)
+        if any(done(p) for p in base.glob("ncases_*")):
+            subprocess.run([py, "scripts/data_efficiency.py", "--runs-dir", str(base)], cwd=ROOT)
 
 
 if __name__ == "__main__":

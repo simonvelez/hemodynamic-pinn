@@ -31,7 +31,10 @@ import numpy as np
 HERE = Path(__file__).resolve().parent
 OUT = HERE / "cost_study"
 
-CASES = [dict(severity=0.25, u_max=0.2), dict(severity=0.50, u_max=0.2), dict(severity=0.60, u_max=0.1)]
+# 0.35 at u_max 0.1 is a held-out PINN test severity (campaign RE150 split): the comparison on a case the
+# PINN never saw. The others are PINN training severities (range ends and the hardest symmetric case).
+CASES = [dict(severity=0.25, u_max=0.2), dict(severity=0.50, u_max=0.2), dict(severity=0.35, u_max=0.1),
+         dict(severity=0.60, u_max=0.1)]
 MESHES = [(100, 16), (125, 20), (175, 28), (250, 40), (350, 56), (500, 80)]   # r ≈ 1.4 steps
 SCHEMES = [("P2P1", "steady"), ("P1P1", "steady"), ("P2P1", "transient"), ("P1P1", "transient")]
 REFERENCE = dict(nx=700, ny=112, element="P2P1", solve="steady")
@@ -135,6 +138,8 @@ def _interp(src, xy_dst):
 
 def cmd_report(a):
     import csv
+    sys.path.insert(0, str(HERE.parent / "common"))
+    from metrics import node_areas, rel_l2_weighted
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -150,6 +155,7 @@ def cmd_report(a):
         rd, rq = ref["d"], ref["meta"]["qoi"]
         xy = np.column_stack([rd["x"], rd["y"]])
         u_ref, p_ref = np.column_stack([rd["u"], rd["v"]]), rd["p"]
+        w_ref = node_areas(xy, rd["triangles"])     # area weights for the l2_*_area keys (guide §7.3)
         for r in matrix():
             if r["ref"] or r["severity"] != c["severity"] or r["u_max"] != c["u_max"]:
                 continue
@@ -168,6 +174,8 @@ def cmd_report(a):
                 n_repeats=len(reps),
                 l2_vel=float(np.linalg.norm(f[ok, :2] - u_ref[ok]) / np.linalg.norm(u_ref[ok])),
                 l2_p=float(np.linalg.norm(f[ok, 2] - p_ref[ok]) / np.linalg.norm(p_ref[ok])),
+                l2_vel_area=rel_l2_weighted(f[ok, :2], u_ref[ok], w_ref[ok]),
+                l2_p_area=rel_l2_weighted(f[ok, 2], p_ref[ok], w_ref[ok]),
                 dp_rel_err=rel(q["dp_pa"], rq["dp_pa"]),
                 wss_peak_rel_err=rel(q["wss_peak_pa"], rq["wss_peak_pa"]),
                 recirc_rel_err=rel(q["recirc_len"], rq["recirc_len"])))

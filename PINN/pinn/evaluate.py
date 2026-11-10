@@ -14,6 +14,7 @@ from .train import load_checkpoint, predict, rel_l2
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "common"))
 from manifest import RunLog  # noqa: E402
+from metrics import node_areas, rel_l2_weighted  # noqa: E402
 
 
 def pinn_wss(model, case, geo, Re, device="cpu"):
@@ -224,8 +225,12 @@ def evaluate(run_dir, data_dir=None, plots=True, device=None):
             wm = wss_metrics(c, tau_p, geo) if tau_p is not None else {}
         dp_cfd = c.dp() * scales.P
         dp_pinn = (pred[c.flag == 1, 2].mean() - pred[c.flag == 2, 2].mean()) * scales.P
+        # Area-weighted counterparts of l2_vel / l2_p (guide §7.3; docs/DEVIATIONS.md D-009).
+        w = node_areas(c.xy, c.triangles)
+        m_area = dict(l2_vel_area=rel_l2_weighted(pred[:, :2], c.uvp[:, :2], w),
+                      l2_p_area=rel_l2_weighted(pred[:, 2], c.uvp[:, 2], w))
         rows.append(dict(severity=c.severity, split="test" if c.severity in test_s else "train",
-                         **{f"l2_{k}": v for k, v in m.items()},
+                         **{f"l2_{k}": v for k, v in m.items()}, **m_area,
                          **pressure_metrics(c, pred), **wm,
                          dp_cfd_pa=float(dp_cfd), dp_pinn_pa=float(dp_pinn),
                          dp_rel_err=float(abs(dp_pinn - dp_cfd) / abs(dp_cfd))))

@@ -1,0 +1,49 @@
+# Guide §2 "Lab to fill in" (thesis_docs/2D stenosis PINN and CFD guide.md), filled from the code on 2026-11-09.
+# Values are copied from the code and dataset metadata, not guessed; anything not in the repo is UNKNOWN.
+# Deviations from the guide are listed in docs/DEVIATIONS.md.
+cfd:
+  solver: "FEniCSx (dolfinx 0.11) + PETSc/MUMPS"                      # ns_cfd/solver_2d.py
+  discretization: "finite_element, P2/P1 Taylor-Hood (legacy P1/P1 + SUPG/PSPG selectable)"
+  time_scheme: "steady Newton with continuation in inlet velocity (datasets); implicit midpoint for transient checks"
+  geometry_type: "planar"                                            # 2D channel, walls at y = ±r(x); not axisymmetric
+  severity_definition: "diameter_stenosis (planar DS = reduction of channel height); values 0.20-0.70 (CFD 0.30-0.70 + 0.20/0.25)"
+  shape_function: "cosine, symmetric on both walls; lesion length L_s = 8 mm = 1.6 H"   # ns_cfd/mesh_2d.py:16
+  D0_or_H0_mm: "H0 = 5.0 (channel height; half-height R = 2.5)"
+  domain: {inlet_len_D: "1.2 (6 mm straight before the lesion)", outlet_len_D: "7.2 (36 mm straight after it); total L = 50 mm"}
+  flow:
+    steady_or_pulsatile: "steady"
+    Q_mean_mL_min_or_U_mean: "U_mean = 2/3 u_max: 0.133 m/s (u_max 0.2) and 0.067 m/s (u_max 0.1)"
+    T_s: "n/a (steady)"
+    waveform: "n/a (steady)"
+  numbers:
+    # Two operating points. Code label "Re" = rho * u_max * H / mu.
+    Re_mean: "201 (u_max 0.2) / 100 (u_max 0.1)  [U_mean, H]"
+    Re_peak: "301 / 150  [u_max, H]   (also 151 / 75 on u_max and half-height R, Fearn et al. convention)"
+    Re_length_scale: "H = 5 mm (full channel height)"
+    Re_velocity_scale: "u_max (code); U_mean given above"
+    Wo: "n/a (steady)"
+  fluid: {rho: "1055 kg/m3", mu: "3.5e-3 Pa s", newtonian: "yes"}
+  inlet: "parabolic velocity, Dirichlet (flow-rate controlled)"
+  outlet: "zero-traction (do-nothing, gradient viscous form), i.e. p = 0 for fully developed flow"
+  mesh: {n_cells: "250 x 40 x 4 = 40000 triangles (crossed, mirror-symmetric about the centreline)", wall_layers: "none (uniform in eta = y/r(x))", h_wall_over_D: "1/40 (structured, uniform across)"}
+  dt: "n/a for datasets (steady); 2 ms in transient checks"
+  cycles_run_and_analysed: "n/a (steady)"
+  verification: "Poiseuille (ns_cfd/tests/test_poiseuille.py), 3-mesh GCI (ns_cfd/mesh_study.py), mass error per run, stability test of the symmetric branch (ns_cfd/stability_test.py)"
+pinn:
+  framework: "plain PyTorch (version recorded in each run_manifest.json)"
+  formulation: "primitive (u, v, p), nondimensional (x/H, u/u_max, p/(rho u_max^2)), parametric in severity: (x, y, s) -> (u, v, p)"
+  bc_enforcement: "soft, with gradient-based adaptive weights (lambda_max 10)"
+  network: {depth: "5 hidden layers", width: "128", activation: "tanh (sine/Fourier optional)", precision: "float32 default; float64 option"}
+  optimizer: "Adam 1e-3 (StepLR x0.5 every 4000) for 20000 steps, then L-BFGS (strong Wolfe) up to 2000 iterations"
+  data_free_or_data_assisted: "data-assisted: 500 CFD velocity sensors per training severity (physics-only and data-only baselines available)"
+hardware:
+  # The proposal names the CALDAS HPC cluster; the campaign runs on a workstation instead (docs/DEVIATIONS.md D-008).
+  development: "laptop, AMD Ryzen 7 PRO 5850U, CPU only"
+  campaign: "workstation with NVIDIA RTX A4000 (CPU model UNKNOWN until recorded by run_manifest.json)"
+hardware_caldas:
+  cpu_model_and_cores_per_node: "not used"
+  gpu_available: "not used"
+  scheduler_and_limits: "not used"
+  container_policy: "not used"
+  filesystem_scratch: "not used"
+  energy_accounting: "none"

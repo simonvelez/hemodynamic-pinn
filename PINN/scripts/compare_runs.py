@@ -15,7 +15,7 @@ from pathlib import Path
 
 import numpy as np
 
-COLS = [("l2_vel", "vel L2"), ("l2_p", "p L2"), ("p_rms_over_dp", "p RMS/Δp"), ("dp_rel_err", "Δp err"),
+COLS = [("l2_vel", "vel L2"), ("l2_vel_area", "vel L2 (area)"), ("l2_p", "p L2"), ("p_rms_over_dp", "p RMS/Δp"), ("dp_rel_err", "Δp err"),
         ("l2_wss", "WSS L2")]   # metrics missing from older runs are shown as "–"
 
 
