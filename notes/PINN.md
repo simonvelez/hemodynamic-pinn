@@ -184,7 +184,12 @@ Metrics:
 - relative L2 error over all CFD nodes for velocity (u, v together), u, v and p;
 - Δp = mean p on inlet nodes − mean p on outlet nodes, compared with the same quantity from CFD.
 
-### Run 1: `runs/hybrid_s20-50` (Re ≈ 301, 20k steps, λ_max = 1e3)
+The runs up to "Seed variance and physics-only ablation" were trained on retired datasets (first the
+`right`-diagonal mesh, then the P1/P1 `crossed` datasets; `old/README.md`). They were moved to
+`old/pinn_runs/` (git-ignored, like `PINN/runs/`) on 2026-11-10. The current runs are `runs/p2_re150` and
+`runs/p2_re301` (§ "2026-11-08"); the A4000 campaign (`runs/campaign/`) replaces the seed and physics-only results.
+
+### Run 1: `old/pinn_runs/hybrid_s20-50` (Re ≈ 301, 20k steps, λ_max = 1e3)
 | Severity | Split | Velocity L2 | p L2 | Δp CFD | Δp PINN | Δp error |
 |---|---|---|---|---|---|---|
 | 0.20 | train | 0.46 % | 50 % | 12.2 Pa | 6.9 Pa | 43 % |
@@ -192,7 +197,7 @@ Metrics:
 | 0.45 | **test** | 0.99 % | 23 % | 19.3 Pa | 14.9 Pa | 22 % |
 | 0.50 | train | 1.92 % | 27 % | 23.2 Pa | 16.4 Pa | 30 % |
 
-### Run 2: `runs/hybrid_re150_s20-60` (Re ≈ 150, 20k steps, λ_max = 1e3)
+### Run 2: `old/pinn_runs/hybrid_re150_s20-60` (Re ≈ 150, 20k steps, λ_max = 1e3)
 Velocity L2 is 0.4–1.6 % (held-out 0.46 % and 1.01 %). p L2 is 40–63 %, and Δp is underestimated by 24–44 %.
 
 **Velocity is excellent, and held-out severities are as accurate as training ones, so the surrogate
@@ -205,7 +210,7 @@ dp*/dx* = −8/Re per diameter, which is about 11 Pa of the 12 Pa at 20 % (Re �
 - The PDE loss stalled at about 1e-2, an RMS residual of about 0.1. That is roughly four times larger than the viscous pressure gradient it should resolve.
 - Velocity is pinned by the data, but pressure is informed only by the physics, so the viscous Δp was lost.
 
-### Check run: `runs/check_re150_lmax10_5k` (Re ≈ 150, **λ_max = 10**, only 5k steps)
+### Check run: `old/pinn_runs/check_re150_lmax10_5k` (Re ≈ 150, **λ_max = 10**, only 5k steps)
 | | Run 2 (20k steps, λ_max 1e3) | Check (5k steps, λ_max 10) |
 |---|---|---|
 | p L2 | 40–63 % | **11–19 %** |
@@ -216,7 +221,7 @@ dp*/dx* = −8/Re per diameter, which is about 11 Pa of the 12 Pa at 20 % (Re �
 This confirms the diagnosis. There is a **trade-off**: a lower cap gives better physics and pressure
 but less weight on data and boundaries, so velocity is somewhat worse at equal steps.
 
-### Full rerun: `runs/full_re301_lmax10` and `runs/full_re150_lmax10` ✔ current best
+### Full rerun: `old/pinn_runs/full_re301_lmax10` and `old/pinn_runs/full_re150_lmax10` (best before the P2/P1 datasets)
 Configuration: λ_max = 10, 20k Adam steps + 2000 L-BFGS, trained on the **regenerated datasets on the
 symmetric `crossed` CFD mesh** (20,291 nodes per case). These settings are now the code defaults.
 
@@ -255,7 +260,7 @@ Training took 2.1–2.2 h per run (8 CPU threads). Inference takes about 38 ms f
 
 ---
 
-### Seed variance and physics-only ablation (Re ≈ 150; `runs/comparison_re150.md`)
+### Seed variance and physics-only ablation (Re ≈ 150; `old/pinn_runs/comparison_re150.md`)
 Made with `scripts/compare_runs.py`. "Hybrid" = the full configuration over 3 seeds (0, 1, 2), shown
 as mean ± std. A different seed changes the network initialisation, the sensor locations and the
 collocation sampling. "Physics-only" = the same configuration with `--lambda-data 0`.

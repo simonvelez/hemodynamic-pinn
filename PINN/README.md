@@ -16,15 +16,16 @@ L = L_pde + λ_wall·L_wall + λ_inlet·L_inlet + λ_outlet·L_outlet + λ_data�
 | pde    | random interior points (x,y,s) | (u·∇)u + ∇p − Re⁻¹∇²u = 0,  ∇·u = 0         |
 | wall   | analytic stenosis wall         | u = v = 0                                  |
 | inlet  | x = 0                          | u = 1 − (y/R)², v = 0                      |
-| outlet | x = L                          | p = 0 (matches the CFD do-nothing outlet)  |
+| outlet | x = L                          | traction −p + u_x/Re = 0, v_x = 0 (matches the CFD outlet) |
 | data   | `n_sensors` CFD nodes per training severity | u, v (+ p with `--data-pressure`) |
 
 The λ's adapt during training using gradient statistics (Wang, Teng & Perdikaris 2021),
 as in CardiovascularPINNs. Setting `--lambda-data 0` turns off the data term and gives a
 standard physics-only PINN for comparison.
 
-All quantities are nondimensional: `x* = x/D`, `u* = u/U`, `p* = p/(ρU²)`, with
-Re = ρUD/μ ≈ 301 for the default CFD settings. Collocation points are drawn
+All quantities are nondimensional: `x* = x/H`, `u* = u/u_max`, `p* = p/(ρ u_max²)`, with
+Re = ρ u_max H/μ: ≈ 301 for `ns_cfd/output_2d` (the config default) and ≈ 150 for `ns_cfd/output_2d_re150`
+(used by the campaign). See `docs/lab_to_fill_in.yaml` for the other Re conventions. Collocation points are drawn
 continuously over severity, so the physics also constrains severities that have no
 CFD data.
 
@@ -33,36 +34,47 @@ CFD data.
 pinn/config.py     all hyperparameters (dataclass); every field is a CLI flag
 pinn/scaling.py    nondimensionalisation, nondimensional geometry
 pinn/geometry.py   analytic wall r(x, s) (same as ns_cfd/mesh_2d.py) + point samplers
-pinn/data.py       load/validate npz cases, train/test split, sensor sampling
+pinn/data.py       load/validate npz cases (skips asymmetric ones), train/test split, sensor sampling
 pinn/models.py     MLP (tanh | SIREN, optional Fourier features), input scaling built in
-pinn/physics.py    NS residuals with autograd
+pinn/physics.py    NS residuals, outlet traction and wall shear stress with autograd
 pinn/losses.py     loss terms + AdaptiveWeights
-pinn/train.py      Adam + StepLR (+ optional L-BFGS), checkpoints, losses.csv
-pinn/evaluate.py   rel-L2 per severity, Δp vs severity, CFD/PINN/error plots, timing
-scripts/           train.py / evaluate.py command-line entry points
-tests/             pytest: Poiseuille residual, geometry vs CFD wall, data split
+pinn/train.py      Adam + StepLR, then L-BFGS; checkpoints, losses.csv, run_manifest.json, cost.json
+pinn/evaluate.py   per-severity metrics (node- and area-weighted L2, Δp, WSS, recirculation), plots, timing
+scripts/train.py, scripts/evaluate.py   command-line entry points
+scripts/campaign.py       the comparison and robustness campaign (A4000), resumable
+scripts/compare_runs.py   per-severity table, mean ± std over groups of runs
+scripts/data_efficiency.py  error vs number of CFD runs used for training (campaign group ncases_*)
+scripts/cfd_vs_pinn.py    equal-accuracy CFD baseline (ns_cfd cost study) and break-even N*
+tests/             pytest (15): Poiseuille residual/traction/WSS, autodiff vs FD, geometry vs CFD wall,
+                   data split, area-weighted metrics
+runs/              outputs (git-ignored): p2_re150, p2_re301 (current), campaign/ (A4000), campaign_smoke/
 ```
+Shared helpers live in `../common/` (`manifest.py`: run provenance and cost ledger; `metrics.py`:
+area-weighted L2). Older runs on retired datasets are in `../old/pinn_runs/`.
 
-## Usage (environment `fenicsx-env`, CPU)
+## Usage (environment `fenicsx-env`; setup in `../docs/SETUP.md`)
+The CFD datasets are in git (`ns_cfd/output_2d`, `ns_cfd/output_2d_re150`); regenerate them only if the
+CFD changes (`ns_cfd/generate_dataset_2d.py`, see `notes/CFD.md`).
+
 ```bash
-# 1. CFD data (symmetric `crossed` mesh by default; see notes/CFD.md for the usable ranges)
-cd ns_cfd && python generate_dataset_2d.py --severities 0.20 0.25 0.30 0.35 0.40 0.45 0.50    # Re≈301
-python generate_dataset_2d.py --u-max 0.1 --t-final 4.0 --output-dir output_2d_re150 \
-    --severities 0.20 0.25 0.30 0.35 0.40 0.45 0.50 0.55 0.60                               # Re≈150
+cd PINN
+python -m pytest -q tests
 
-# 2. Tests
-cd PINN && python -m pytest -q tests
+# One run: Re ≈ 150, 0.35 and 0.55 held out (as in the campaign); add --device cuda on a GPU
+python scripts/train.py --out-dir runs/my_run --data-dir ../ns_cfd/output_2d_re150 --test-severities 0.35 0.55
+python scripts/evaluate.py --run runs/my_run      # metrics.json + plots in runs/my_run/
 
-# 3. Train (0.35 and 0.45 are held out by default) and evaluate
-python scripts/train.py --out-dir runs/hybrid
-python scripts/evaluate.py --run runs/hybrid      # metrics.json + plots in runs/hybrid/
-
-# Physics-only baseline for comparison
+# Baselines: physics-only (--lambda-data 0) and data-only (--lambda-pde 0)
 python scripts/train.py --out-dir runs/physics_only --lambda-data 0
+
+# Full campaign (list first; --smoke = 200-step pipeline check)
+python scripts/campaign.py --dry-run
+python scripts/campaign.py --device cuda
+python scripts/cfd_vs_pinn.py                     # after ns_cfd/cost_study.py batch + report
 ```
 
-The loader skips cases whose `meta` reports `steady=False` or
-`symmetry_error > --max-symmetry-error`.
+The loader skips cases whose `meta` reports `steady=False`, `branch: asymmetric`, or
+`symmetry_error > --max-symmetry-error`. Design decisions and results: `../notes/PINN.md`.
 
 ## References
 - `old/PINN_mvp/juanes_pinn.py`: the hybrid data+physics pipeline and parameter-vector inputs this builds on.

@@ -1,8 +1,8 @@
 """Compare evaluated runs: per-severity table, mean ± std over groups (e.g. seeds).
 
-    python scripts/compare_runs.py runs/full_re150_lmax10 runs/physics_only_re150
-    python scripts/compare_runs.py --group hybrid=runs/full_re150_lmax10* --group physics=runs/physics_only_re150
-    python scripts/compare_runs.py ... --out runs/comparison_re150.md
+    python scripts/compare_runs.py runs/p2_re150 runs/campaign/physonly
+    python scripts/compare_runs.py --group hybrid="runs/campaign/base_re150_s*" --group physics=runs/campaign/physonly
+    python scripts/compare_runs.py ... --out runs/campaign/comparison_re150.md
 
 Each run directory must contain metrics.json (written by scripts/evaluate.py).
 With --group NAME=GLOB, runs matching GLOB are pooled and shown as mean ± std.

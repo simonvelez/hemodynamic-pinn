@@ -14,12 +14,15 @@ Its job is to produce reference blood-flow fields for training and testing the P
 | `generate_dataset_2d.py` | **in use** | Command-line driver: mesh → solve → export `.npz` + field plot + **mesh sheet** for each severity |
 | `mesh_plots.py` | **in use** | Mesh inspection: element quality and the one-page mesh troubleshooting sheet |
 | `mesh_study.py`, `mesh_study/` | **in use** | Mesh-independence study (§9) and its results |
-| `stability_test.py`, `stability/` | **in use** | Disturbance test of the symmetric flow (§9) |
+| `stability_test.py`, `stability/` | **in use** | Disturbance test of the symmetric flow (§9; P1/P1 and P2/P1 rows, §11) |
+| `cost_study.py`, `cost_study/` | **in use** | CFD accuracy-vs-cost matrix (mesh × element × solve mode) against a 700×112 reference: the CFD side of the CFD-vs-PINN comparison. Run on the A4000 (`docs/SETUP.md`) |
+| `zuluaga_check.py`, `zuluaga_check/` | **in use** | Stability check on the labmate's 75 % geometry and formulation (§13) |
 | `wall_shear.py` | **in use** | Wall shear stress (element-wise ∇u, analytic wall normal) and recirculation length from WSS sign changes |
 | `verify_poiseuille.py`, `verification/` | **in use** | Exact-solution check in the straight channel (§11) |
 | `tests/` | **in use** | `python -m pytest -q tests`: Poiseuille checks (P2/P1 exact to round-off; legacy outlet defect detected) |
-| `output_2d/` | data | Datasets at Re ≈ 301 (u_max = 0.2 m/s), severities 20–50 %, `crossed` mesh, **P2/P1, steady solve** (regenerated 2026-11-08) |
-| `output_2d_re150/` | data | Datasets at Re ≈ 150 (u_max = 0.1 m/s), severities 20–60 %, same settings |
+| `output_2d/` | data | Datasets at Re ≈ 301 (u_max = 0.2 m/s), severities 20–70 %, `crossed` mesh, **P2/P1, steady solve** (regenerated 2026-11-08). Symmetric up to 50 %; 55–70 % are the bent-jet branch, tagged `branch: asymmetric` (§12) and skipped by the PINN |
+| `output_2d_re150/` | data | Datasets at Re ≈ 150 (u_max = 0.1 m/s), severities 20–70 %, same settings. Symmetric up to 60 %; 65–70 % asymmetric |
+| `logs/` | log | Generation logs of the 30–70 % sweep (§12) |
 
 Retired code and data live in `old/` (see `old/README.md`): the first 2D prototype, the 3D skeleton,
 `PINN_mvp`, the first datasets made on the asymmetric `right`-diagonal mesh, and the `crossed`-mesh
