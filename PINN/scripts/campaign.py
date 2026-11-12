@@ -74,7 +74,62 @@ def campaign():
         for seed in range(3):
             runs[f"ncases_K{k}_s{seed}"] = ncases_flags(train) + ["--seed", str(seed)]
         runs[f"ncases_K{k}_dataonly"] = ncases_flags(train) + ["--lambda-pde", "0"]
+    runs.update(round2())
     return runs
+
+
+# Round 2 (2026-11-12), in priority order: questions raised by the round-1 results.
+# Run with:  python scripts/campaign.py --only r2_ --device cuda
+LONG = ["--lbfgs-steps", "10000", "--lbfgs-rounds", "5"]                 # 5x L-BFGS, fresh points per round
+ADAM_LONG = ["--steps", "60000", "--lr-step", "12000"] + LONG             # 3x Adam on top
+PLACE = {2: [0.45, 0.60], 3: [0.30, 0.45, 0.60]}                          # CFD runs placed at high severity
+
+
+def round2():
+    r = {}
+    # 1. Fair baselines: both networks also see pressure at the sensors (round 1's data-only never did).
+    for s in range(3):
+        r[f"r2_press_K7_hybrid_s{s}"] = RE150 + ["--data-pressure", "--seed", str(s)]
+        r[f"r2_press_K7_dataonly_s{s}"] = RE150 + ["--data-pressure", "--lambda-pde", "0", "--seed", str(s)]
+    for k in (3, 4):
+        r[f"r2_press_K{k}_hybrid_s0"] = ncases_flags(NCASES[k]) + ["--data-pressure"]
+        r[f"r2_press_K{k}_dataonly_s0"] = ncases_flags(NCASES[k]) + ["--data-pressure", "--lambda-pde", "0"]
+    # 2. Training budget: were the sparse-data and physics-only runs simply under-trained?
+    for s in range(2):
+        r[f"r2_budget_physonly_long_s{s}"] = RE150 + ["--lambda-data", "0", "--seed", str(s)] + LONG
+    for k in (1, 2, 3):
+        for s in range(3):
+            r[f"r2_budget_K{k}_long_s{s}"] = ncases_flags(NCASES[k]) + ["--seed", str(s)] + LONG
+    r["r2_budget_K7_long_s0"] = RE150 + LONG
+    r["r2_budget_K3_adamlong_s0"] = ncases_flags(NCASES[3]) + ADAM_LONG
+    r["r2_budget_physonly_adamlong_s0"] = RE150 + ["--lambda-data", "0"] + ADAM_LONG
+    # 3. Physics weight with sparse data: every round-1 lambda sat at the cap of 10.
+    for lm in ("1", "3", "30"):
+        r[f"r2_lmax{lm}_K3_s0"] = ncases_flags(NCASES[3]) + ["--lambda-max", lm]
+    # 4. Placement: the same K, with the CFD runs where the physics struggles (high severity).
+    for k, train in PLACE.items():
+        for s in range(3):
+            r[f"r2_place_K{k}_s{s}"] = ncases_flags(train) + ["--seed", str(s)]
+        r[f"r2_place_K{k}_dataonly"] = ncases_flags(train) + ["--lambda-pde", "0"]
+    # 5. 60 % edge (WSS ~11 %): Fourier features, SIREN, more throat collocation.
+    r["r2_edge_fourier_s0"] = RE150 + ["--fourier-features", "64", "--fourier-sigma", "1.0"]
+    r["r2_edge_sine_s0"] = RE150 + ["--activation", "sine"]
+    r["r2_edge_focus05_s0"] = RE150 + ["--focus-frac", "0.5"]
+    # 6. Does the physics help more with noisy data?
+    for pct in (5, 10):
+        r[f"r2_noise_{pct}pct_dataonly"] = RE150 + ["--sensor-noise", str(pct / 100), "--lambda-pde", "0"]
+    # 7. Two more seeds for round 1's single-run groups.
+    for s in (1, 2):
+        for n in (250, 100, 50):
+            r[f"r2_sensors_{n}_s{s}"] = RE150 + ["--n-sensors", str(n), "--seed", str(s)]
+        for pct in (1, 5, 10):
+            r[f"r2_noise_{pct}pct_s{s}"] = RE150 + ["--sensor-noise", str(pct / 100), "--seed", str(s)]
+        ext = ["--data-dir", "../ns_cfd/output_2d_re150", "--test-severities", "0.35",
+               "--data-s-range", "0.25", "0.50", "--seed", str(s)]
+        r[f"r2_extrap_physin_s{s}"] = ext
+        r[f"r2_extrap_physout_s{s}"] = ext + ["--physics-s-range", "0.25", "0.50"]
+        r[f"r2_dataonly_s{s}"] = RE150 + ["--lambda-pde", "0", "--seed", str(s)]
+    return r
 
 
 def done(out):

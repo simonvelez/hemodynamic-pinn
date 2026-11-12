@@ -489,19 +489,22 @@ longer representative of both walls; the bent steady state was checked against t
 
 ### Root-cause audit of the asymmetry (2026-11-08)
 
-Question: model, implementation or mesh? Checks (scripts in the session scratchpad; all P2/P1 steady with
-the imperfection continuation unless stated):
+Question: model, implementation or mesh? Checks (all P2/P1 steady with the imperfection continuation unless
+stated). First run on 2026-11-08 with throw-away scripts; since 2026-11-12 most rows are reproducible with
+`ns_cfd/asymmetry_audit.py` (22 distinct steady solves + 11 mesh checks, ~35 min on the laptop; tables in
+`ns_cfd/asymmetry_audit/report.md`). Column "audit" says which rows the script reproduces.
 
-| Check | Result |
-|---|---|
-| Mesh nodes, triangles, boundary tags mirror-symmetric (55 %, 70 %, 250×40) | yes: 40000/40000 triangles, all inlet/outlet/wall facets |
-| Inlet profile, BCs, weak form (`solver_2d.py`) | symmetric: parabolic inlet in y/R, no-slip both walls, do-nothing outlet, no y-biased terms |
-| Plain steady solve / unperturbed transient on the symmetric mesh | stays symmetric to 1e-15 even when unstable (nothing seeds the mode) |
-| Threshold vs downstream length (50 → 100 mm) | unchanged (55 % Re≈301 asym 0.0656 both) |
-| Threshold vs upstream length (2 D → 6 D) | unchanged |
-| Threshold vs mesh (125×20 → 250×40) and element (P1/P1 vs P2/P1) | unchanged (asym 0.066 → 0.071) |
-| Re scan at 70 % | symmetric up to Re 75, bent from Re 100 (Re on D and u_max) |
-| Re scan at 50 % | symmetric up to Re 400, bent at Re 500 |
+| Check | Result | audit |
+|---|---|---|
+| Mesh nodes, triangles, boundary tags mirror-symmetric | yes, exactly, on every mesh the audit uses (11 meshes: 125×20 to 500×40, 50/55/70 %, L 50–100 mm; nodes to 4e-19 m). 2026-11-08: also 65 % | ✔ |
+| Inlet profile, BCs, weak form (`solver_2d.py`) | symmetric: parabolic inlet in y/R, no-slip both walls, do-nothing outlet, no y-biased terms | code review only |
+| Plain steady solve on the symmetric mesh (55 %, Re≈301) | stays symmetric to 5.5e-15 although unstable (nothing seeds the mode) | ✔ |
+| Unperturbed transient on the symmetric mesh | stays symmetric to 1e-15 over the simulated time (2026-11-08; at his 75 % geometry round-off does grow, §13) | ✘ (transient runs: `stability_test.py`, `zuluaga_check.py`) |
+| Threshold vs downstream length (50 → 100 mm) | unchanged: 55 % bent, asym 0.0709 both on 250×40 (2026-11-08: 0.0656 both on 125×20) | ✔ (250×40) |
+| Threshold vs upstream length (2 D → 6 D) | unchanged (55 % bent, asym 0.0709; 50 % symmetric) | ✔ |
+| Threshold vs mesh (125×20 → 250×40) and element (P1/P1 vs P2/P1) | unchanged: P2/P1 asym 0.0655 → 0.0709; P1/P1 bends more (0.12 → 0.10), same branch | ✔ |
+| Re scan at 70 % | symmetric up to Re 75, bent from Re 100 (Re on D and u_max) | ✔ |
+| Re scan at 50 % | symmetric up to Re 400, bent at Re 500 | ✔ |
 
 Conclusion: it is a property of the **planar 2D model** (Navier–Stokes in a symmetric channel expansion
 has a supercritical pitchfork: Cherdron, Durst & Whitelaw 1978; Sobey & Drazin 1986; Fearn, Mullin &

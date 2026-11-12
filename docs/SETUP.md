@@ -1,4 +1,4 @@
-# Setting up a new Linux machine (e.g. the A4000 workstation)
+# Setting up a new Linux machine
 
 This guide sets up everything needed to run the CFD (`ns_cfd/`) and PINN (`PINN/`) code on a fresh
 Linux machine, checks it, and starts the comparison campaign. It assumes a terminal, `git`, internet

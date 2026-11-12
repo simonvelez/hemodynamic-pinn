@@ -195,23 +195,30 @@ def _run_loops(cfg, model, model_kwargs, weights, opt, sched, sample_batch, scal
 
     if cfg.lbfgs_steps > 0:
         with rlog.stage("lbfgs"):
-            # Full-batch polish on one fixed sample, weights frozen at their final values.
-            fixed = sample_batch()
-            lb = torch.optim.LBFGS(model.parameters(), lr=1.0, max_iter=cfg.lbfgs_steps,
-                                   history_size=50, line_search_fn="strong_wolfe")
+            # Full-batch polish, weights frozen at their final values. Each round uses one fixed collocation
+            # sample; several rounds (lbfgs_rounds > 1) redraw it, so a long polish cannot overfit one sample.
+            rounds = max(1, cfg.lbfgs_rounds)
+            per_round = max(1, cfg.lbfgs_steps // rounds)
+            done_iters = 0
+            for r in range(rounds):
+                fixed = sample_batch()
+                lb = torch.optim.LBFGS(model.parameters(), lr=1.0, max_iter=per_round,
+                                       history_size=50, line_search_fn="strong_wolfe")
 
-            def closure():
-                lb.zero_grad(set_to_none=True)
-                loss = weights.total(compute_losses(model, fixed, scales.Re, geo, cfg.outlet_bc, use_pde))
-                loss.backward()
-                return loss
+                def closure():
+                    lb.zero_grad(set_to_none=True)
+                    loss = weights.total(compute_losses(model, fixed, scales.Re, geo, cfg.outlet_bc, use_pde))
+                    loss.backward()
+                    return loss
 
-            lb.step(closure)
-            L = compute_losses(model, fixed, scales.Re, geo, cfg.outlet_bc, use_pde)
-            ev = evaluate_now()
-            log_row(cfg.steps + cfg.lbfgs_steps, L, weights.total(L), t0, ev)
-            print(f"[lbfgs] total={weights.total(L).item():.3e} | vel-L2 train={ev[0]:.3%} "
-                  f"test={ev[1]:.3%}", flush=True)
+                lb.step(closure)
+                done_iters += per_round
+                L = compute_losses(model, fixed, scales.Re, geo, cfg.outlet_bc, use_pde)
+                ev = evaluate_now()
+                log_row(cfg.steps + done_iters, L, weights.total(L), t0, ev)
+                tag = f"[lbfgs {r + 1}/{rounds}]" if rounds > 1 else "[lbfgs]"
+                print(f"{tag} total={weights.total(L).item():.3e} | vel-L2 train={ev[0]:.3%} "
+                      f"test={ev[1]:.3%}", flush=True)
 
     save_checkpoint(out / "model.pt", model, model_kwargs, cfg, scales, geo, s_range,
                     cfg.steps + cfg.lbfgs_steps, weights)

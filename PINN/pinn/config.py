@@ -57,6 +57,7 @@ class Config:
     lr_step: int = 4000
     lr_gamma: float = 0.5
     lbfgs_steps: int = 2000            # L-BFGS polish after Adam (0 = off)
+    lbfgs_rounds: int = 1              # split lbfgs_steps into this many rounds, each on a fresh collocation sample
 
     # --- bookkeeping --------------------------------------------------------
     log_every: int = 100

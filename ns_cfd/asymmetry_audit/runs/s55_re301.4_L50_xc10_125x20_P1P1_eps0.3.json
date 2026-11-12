@@ -1,0 +1,26 @@
+{
+  "solve_id": "s55_re301.4_L50_xc10_125x20_P1P1_eps0.3",
+  "severity": 0.55,
+  "re": 301.4,
+  "u_max": 0.1999810426540284,
+  "length": 0.05,
+  "x_center": 0.01,
+  "nx": 125,
+  "ny": 20,
+  "element": "P1P1",
+  "asym_eps": 0.3,
+  "status": "ok",
+  "symmetry_error": 0.624948937141158,
+  "centreline_asym": 0.1241484127319284,
+  "branch": "asymmetric",
+  "dp_pa": 31.929742335370378,
+  "mass_error": 3.2610675194162515e-16,
+  "newton_iterations": 38,
+  "wall_s": 6.184655877994373,
+  "host": {
+    "hostname": "fedora",
+    "cpu": "AMD Ryzen 7 PRO 5850U with Radeon Graphics",
+    "omp_threads": "1",
+    "note": "run 2026-11-12 before the per-solve layout; host recorded at migration"
+  }
+}
