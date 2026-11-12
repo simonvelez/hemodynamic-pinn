@@ -1,6 +1,6 @@
 {
   "kind": "cfd_cost_study",
-  "git_commit": "76fe601e007709d866b99dbfc58ebd0a372ebf82",
+  "git_commit": "c7361ed7ef3e895b06f8712fef3450cf18418b05",
   "git_dirty": true,
   "command": "cost_study.py batch",
   "cwd": "/home/nova/Documents/simonv/hemodynamic-pinn/ns_cfd",
@@ -33,8 +33,8 @@
   "config": {
     "repeats": 3
   },
-  "t_start": "2026-11-11T13:49:04.506903+00:00",
+  "t_start": "2026-11-11T22:23:51.091153+00:00",
   "status": "done",
-  "t_end": "2026-11-11T19:31:24.552668+00:00",
+  "t_end": "2026-11-12T04:07:39.040110+00:00",
   "metrics": {}
 }
